@@ -2,22 +2,6 @@
 // game.js — 강화 핵심 로직
 // ============================================================
 
-// ─── 클라이언트 레이트리밋 (Firebase 호출 없음) ──────────────
-
-const _rl = { startMs: Date.now(), count: 0 };
-
-function checkRateLimitLocal() {
-  const now = Date.now();
-  if (now - _rl.startMs > 60000) {
-    _rl.startMs = now;
-    _rl.count = 1;
-    return true;
-  }
-  if (_rl.count >= RATE_LIMIT.maxPerMinute) return false;
-  _rl.count++;
-  return true;
-}
-
 // ─── 비용 사전 검증 (로컬) ──────────────────────────────────
 
 function checkCost(user, cost) {
@@ -42,11 +26,6 @@ function checkCost(user, cost) {
  * @returns {{success: boolean, drop?: {key, amount}, blocked?: boolean, error?: string}}
  */
 function enhance(user) {
-  // 레이트리밋 (로컬, 0ms)
-  if (!checkRateLimitLocal()) {
-    return { success: false, blocked: true, error: '잠깐! 너무 빠릅니다. 잠시 후 다시 시도하세요.' };
-  }
-
   const stage = STAGES[user.currentStar];
   if (!stage || stage.cost === null) {
     return { success: false, error: '강화할 수 없는 단계입니다.' };

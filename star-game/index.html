@@ -321,6 +321,9 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
   const btn = document.getElementById('btn-enhance');
   btn.disabled = true;
 
+  const level = currentUser.currentStar;
+  const stage = STAGES[level];
+
   const result = await enhance(currentUser);
 
   if (result.blocked || result.error) {
@@ -333,12 +336,24 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
     return;
   }
 
-  const level = currentUser.currentStar;
-  const stage = STAGES[level];
+  // 비용을 로컬에 즉시 반영 (Firebase에는 enhance()가 이미 차감함)
+  if (stage.cost) {
+    if (stage.cost.type === 'hydrogen') currentUser.hydrogen -= stage.cost.amount;
+    else if (stage.cost.type === 'item') currentUser.items[stage.cost.key] -= stage.cost.amount;
+    else if (stage.cost.type === 'star') {
+      if (!currentUser.storedStars) currentUser.storedStars = {};
+      currentUser.storedStars[stage.cost.level] -= stage.cost.amount;
+    }
+  }
 
   if (result.success) {
-    // 성공 시 오버레이 없이 바로 UI 갱신
-    await reload();
+    // Firebase 재조회 없이 로컬 상태만 업데이트 → 즉각 반응
+    const newLevel = level + 1;
+    currentUser.currentStar = newLevel;
+    if (newLevel > (currentUser.bestStar || 0)) currentUser.bestStar = newLevel;
+    const unlocked = currentUser.unlockedCodex || [];
+    if (!unlocked.includes(newLevel)) currentUser.unlockedCodex = [...unlocked, newLevel];
+    updateUI(currentUser);
   } else {
     // 실패
     pendingState = {

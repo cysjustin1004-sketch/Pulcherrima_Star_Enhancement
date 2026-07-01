@@ -529,4 +529,4 @@ const IMPORTANT_ITEM_WARNINGS = {
 const RATE_LIMIT = { maxPerMinute: 50 };
 
 // 신규 유저 시작 수소
-const STARTING_HYDROGEN = 500;
+const STARTING_HYDROGEN = 2000000;

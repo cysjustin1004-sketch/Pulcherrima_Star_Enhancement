@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>별 강화하기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ───────────────── 강화 결과 오버레이 ───────────────── -->
+<div class="result-overlay" id="result-overlay">
+  <div class="result-title" id="result-title"></div>
+  <div class="result-desc"  id="result-desc"></div>
+
+  <!-- 드랍 줍기 버튼 (실패 후 드랍 아이템 있을 때만 표시) -->
+  <div id="pickup-section" style="display:none; width:100%; max-width:280px;">
+    <div style="font-size:0.85rem; color:var(--text-sub); margin-bottom:0.5rem;">
+      드랍 아이템이 떨어졌습니다! 지금 줍지 않으면 사라집니다.
+    </div>
+    <button class="btn-blue" id="btn-pickup" style="width:100%"></button>
+  </div>
+
+  <!-- 방지권 선택 (실패 후 하락 위기일 때만 표시) -->
+  <div id="protection-section" style="display:none; width:100%; max-width:280px;">
+    <div style="font-size:0.85rem; color:var(--text-sub); margin-bottom:0.5rem;" id="protection-desc"></div>
+    <div class="result-actions">
+      <button class="btn-success" id="btn-use-protection">붕괴 방지권 사용</button>
+      <button class="btn-danger"  id="btn-skip-protection">그냥 하락 수용</button>
+    </div>
+  </div>
+
+  <!-- 확인 버튼 (최종 단계) -->
+  <div id="confirm-section" style="display:none; width:100%; max-width:280px;">
+    <button class="btn-primary" id="btn-confirm">확인</button>
+  </div>
+</div>
+
+<!-- ───────────────── 메인 콘텐츠 ───────────────── -->
+<div class="page" id="main-page">
+
+  <!-- 상태 바 -->
+  <div class="status-bar">
+    <div class="status-item">
+      <div class="status-label">닉네임</div>
+      <div class="status-value" id="stat-nickname" style="font-size:0.85rem; color:var(--text);">...</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">수소 💧</div>
+      <div class="status-value" id="stat-hydrogen">-</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">방지권 🛡</div>
+      <div class="status-value" id="stat-protection">-</div>
+    </div>
+  </div>
+
+  <!-- 별 시각화 -->
+  <div class="star-display">
+    <div class="star-level" id="star-level-text">+0강</div>
+    <div class="star-name"  id="star-name">오리온 성운</div>
+    <div class="star-subname" id="star-subname">M42</div>
+
+    <div class="star-visual">
+      <div class="star-core type-nebula" id="star-core"></div>
+    </div>
+
+    <div class="star-type-badge" id="star-type-badge">성간 가스 구름</div>
+  </div>
+
+  <!-- 강화 정보 카드 -->
+  <div class="card" id="enhance-info-card">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+      <span style="font-size:0.8rem; color:var(--text-sub); font-weight:700; text-transform:uppercase; letter-spacing:0.07em;">강화 정보</span>
+      <span style="font-size:0.8rem; color:var(--text-sub);">다음: <span id="next-star-name" style="color:var(--accent);">-</span></span>
+    </div>
+
+    <!-- 성공 확률 -->
+    <div style="display:flex; justify-content:space-between; font-size:0.88rem; margin-bottom:0.4rem;">
+      <span style="color:var(--text-sub);">성공 확률</span>
+      <span style="color:var(--success); font-weight:700;" id="success-rate-text">-</span>
+    </div>
+    <div class="rate-bar">
+      <div class="rate-fill" id="rate-fill" style="width:0%; background:var(--success);"></div>
+    </div>
+
+    <!-- 비용 -->
+    <div style="display:flex; justify-content:space-between; font-size:0.88rem; margin-top:0.75rem;">
+      <span style="color:var(--text-sub);">강화 비용</span>
+      <span style="font-weight:700;" id="cost-text">-</span>
+    </div>
+
+    <!-- 방지권 정보 -->
+    <div style="display:flex; justify-content:space-between; font-size:0.82rem; margin-top:0.4rem;" id="protection-info-row">
+      <span style="color:var(--text-sub);">방지권</span>
+      <span id="protection-cost-text" style="color:var(--text-sub);">-</span>
+    </div>
+  </div>
+
+  <!-- +29 달성 메시지 (평소 숨김) -->
+  <div class="card" id="legend-card" style="display:none; text-align:center;">
+    <div style="font-size:2rem; margin-bottom:0.5rem;">✨</div>
+    <div style="font-size:1.1rem; font-weight:700; color:var(--accent); margin-bottom:0.4rem;">빅뱅 달성!</div>
+    <div style="font-size:0.85rem; color:var(--text-sub);">우주를 탄생시켰습니다. 전설의 경지에 올랐습니다.</div>
+  </div>
+
+  <!-- 강화 버튼 영역 -->
+  <div class="enhance-section" id="enhance-section">
+    <button class="btn-enhance" id="btn-enhance">⚡ 강화하기</button>
+
+    <!-- 별 보관 버튼 (보관 가능한 별에서만 표시) -->
+    <button class="btn-outline" id="btn-store" style="display:none;">📦 별 보관하기</button>
+
+    <!-- 액션 행: 0강=아이템창+상점 / 1강+=조합소+판매하기 -->
+    <div class="action-row">
+      <button class="btn-secondary" id="btn-left"  onclick="location.href='combine.html'">조합소</button>
+      <button class="btn-secondary" id="btn-right" onclick="location.href='shop.html'">상점</button>
+    </div>
+  </div>
+
+</div><!-- /.page -->
+
+<!-- ───────────────── 하단 네비게이션 ───────────────── -->
+<nav class="bottom-nav">
+  <a class="nav-item active" href="index.html">
+    <span class="nav-icon">⭐</span>강화
+  </a>
+  <a class="nav-item" href="codex.html">
+    <span class="nav-icon">📖</span>도감
+  </a>
+  <a class="nav-item" href="ranking.html">
+    <span class="nav-icon">🏆</span>랭킹
+  </a>
+  <a class="nav-item" href="#" id="nav-logout">
+    <span class="nav-icon">🚪</span>로그아웃
+  </a>
+</nav>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="firebase.js"></script>
+<script src="auth.js"></script>
+<script src="game.js"></script>
+<script>
+// ───────────────────────────────────────────────────
+// index.html 전용 스크립트 — UI 제어 + 강화 흐름
+// ───────────────────────────────────────────────────
+
+// 세션 확인
+const session = requireAuth();
+if (!session) throw new Error('no session');
+
+// 전역 상태
+let currentUser = null;
+// 실패 시 임시 저장: 드랍 처리 여부를 추적하기 위해
+let pendingState = {
+  failed: false,
+  drop: null,
+  dropPickedUp: false,
+  needFallback: false, // 방지권 선택 후 하락 여부
+};
+
+// ─── UI 업데이트 ────────────────────────────────────
+
+function updateUI(user) {
+  currentUser = user;
+  const level = user.currentStar || 0;
+  const stage = STAGES[level];
+
+  // 상태 바
+  document.getElementById('stat-nickname').textContent = user.nickname;
+  document.getElementById('stat-hydrogen').textContent  = formatNumber(user.hydrogen || 0);
+  document.getElementById('stat-protection').textContent = user.protectionScrolls || 0;
+
+  // 별 표시
+  document.getElementById('star-level-text').textContent = `+${level}강`;
+  document.getElementById('star-name').textContent        = stage.name;
+  document.getElementById('star-subname').textContent     = stage.subname;
+  document.getElementById('star-type-badge').textContent  = stage.type;
+
+  const coreEl = document.getElementById('star-core');
+  // CSS 타입 클래스 교체
+  coreEl.className = 'star-core ' + getStarCssClass(level);
+
+  // 강화 정보
+  if (stage.cost === null) {
+    // +29: 전설 달성, 강화 불가
+    document.getElementById('enhance-section').style.display  = 'none';
+    document.getElementById('enhance-info-card').style.display = 'none';
+    document.getElementById('legend-card').style.display      = '';
+    return;
+  }
+
+  document.getElementById('enhance-section').style.display  = '';
+  document.getElementById('enhance-info-card').style.display = '';
+  document.getElementById('legend-card').style.display      = 'none';
+
+  // 다음 단계 이름
+  const nextStage = STAGES[level + 1];
+  document.getElementById('next-star-name').textContent = nextStage ? nextStage.name : '-';
+
+  // 성공 확률
+  const rate = Math.round(stage.successRate * 100);
+  document.getElementById('success-rate-text').textContent = `${rate}%`;
+  document.getElementById('rate-fill').style.width = `${rate}%`;
+  // 확률에 따른 색상
+  const rateFill = document.getElementById('rate-fill');
+  if (rate >= 70)      rateFill.style.background = 'var(--success)';
+  else if (rate >= 40) rateFill.style.background = 'var(--accent)';
+  else                 rateFill.style.background = 'var(--danger)';
+
+  // 강화 비용 (formatCost가 <span> HTML 반환)
+  document.getElementById('cost-text').innerHTML = formatCost(stage.cost, user);
+
+  // 방지권 정보
+  const protRow = document.getElementById('protection-info-row');
+  const protText = document.getElementById('protection-cost-text');
+  if (level <= 3) {
+    protText.textContent = '하락 없음';
+    protText.style.color = 'var(--success)';
+  } else if (stage.protectionCost === -1) {
+    protText.textContent = '방지 불가';
+    protText.style.color = 'var(--danger)';
+  } else if (stage.protectionCost > 0) {
+    protText.textContent = `방지권 ${stage.protectionCost}개 필요 (보유: ${user.protectionScrolls || 0})`;
+    protText.style.color = 'var(--text-sub)';
+  } else {
+    protText.textContent = '-';
+    protText.style.color = 'var(--text-sub)';
+  }
+
+  // 별 보관 버튼 (1강 이상에서 보관 가능)
+  const btnStore = document.getElementById('btn-store');
+  btnStore.style.display = level >= 1 ? '' : 'none';
+
+  // 액션 행: 0강=아이템창+상점 / 1강+=조합소+판매
+  const btnLeft  = document.getElementById('btn-left');
+  const btnRight = document.getElementById('btn-right');
+  if (level === 0) {
+    btnLeft.textContent  = '아이템창';
+    btnLeft.onclick      = () => location.href = 'combine.html';
+    btnRight.textContent = '상점';
+    btnRight.onclick     = () => location.href = 'shop.html';
+  } else {
+    btnLeft.textContent  = '조합소';
+    btnLeft.onclick      = () => location.href = 'combine.html';
+    btnRight.textContent = `판매 (${formatNumber(stage.sellPrice || 0)} 수소)`;
+    btnRight.onclick     = handleSell;
+    // 판매 불가 시 비활성화 (+28)
+    btnRight.disabled    = !stage.sellPrice;
+  }
+
+  // 강화 버튼 텍스트
+  document.getElementById('btn-enhance').textContent = '⚡ 강화하기';
+  document.getElementById('btn-enhance').disabled    = !canAffordCost(stage.cost, user);
+}
+
+/** 비용을 사람이 읽기 좋은 문자열로 변환 */
+function formatCost(cost, user) {
+  if (!cost) return '-';
+  if (cost.type === 'hydrogen') {
+    if (cost.amount === 0) return '무료';
+    const enough = (user.hydrogen || 0) >= cost.amount;
+    const color   = enough ? 'var(--success)' : 'var(--danger)';
+    return `<span style="color:${color}">${formatNumber(cost.amount)} 수소</span>`;
+  }
+  if (cost.type === 'item') {
+    const held    = (user.items && user.items[cost.key]) || 0;
+    const enough  = held >= cost.amount;
+    const color   = enough ? 'var(--success)' : 'var(--danger)';
+    return `<span style="color:${color}">${ITEM_NAMES[cost.key]} ${cost.amount}개 (보유: ${held})</span>`;
+  }
+  if (cost.type === 'star') {
+    const stored  = (user.storedStars && user.storedStars[cost.level]) || 0;
+    const enough  = stored >= cost.amount;
+    const color   = enough ? 'var(--success)' : 'var(--danger)';
+    const name    = STAGES[cost.level] ? STAGES[cost.level].name : `+${cost.level}강 별`;
+    return `<span style="color:${color}">${name} ${cost.amount}개 (보유: ${stored})</span>`;
+  }
+  return '-';
+}
+
+/** 비용을 감당할 수 있는지 확인 */
+function canAffordCost(cost, user) {
+  if (!cost) return false;
+  if (cost.type === 'hydrogen') return (user.hydrogen || 0) >= cost.amount;
+  if (cost.type === 'item')     return ((user.items && user.items[cost.key]) || 0) >= cost.amount;
+  if (cost.type === 'star')     return ((user.storedStars && user.storedStars[cost.level]) || 0) >= cost.amount;
+  return false;
+}
+
+// ─── 오버레이 제어 ─────────────────────────────────
+
+function showOverlay(titleText, titleClass, descText) {
+  const overlay = document.getElementById('result-overlay');
+  document.getElementById('result-title').textContent = titleText;
+  document.getElementById('result-title').className   = 'result-title ' + (titleClass || '');
+  document.getElementById('result-desc').textContent  = descText || '';
+  document.getElementById('pickup-section').style.display     = 'none';
+  document.getElementById('protection-section').style.display = 'none';
+  document.getElementById('confirm-section').style.display    = 'none';
+  overlay.classList.add('visible');
+}
+
+function hideOverlay() {
+  document.getElementById('result-overlay').classList.remove('visible');
+}
+
+function showConfirmButton() {
+  document.getElementById('confirm-section').style.display = '';
+}
+
+// ─── 강화 흐름 ─────────────────────────────────────
+
+document.getElementById('btn-enhance').addEventListener('click', async () => {
+  if (!currentUser) return;
+  const btn = document.getElementById('btn-enhance');
+  btn.disabled = true;
+
+  const result = await enhance(currentUser);
+
+  if (result.blocked || result.error) {
+    showOverlay('⚠️ 주의', '', result.error || '오류가 발생했습니다.');
+    showConfirmButton();
+    document.getElementById('btn-confirm').onclick = async () => {
+      hideOverlay();
+      await reload();
+    };
+    return;
+  }
+
+  const level = currentUser.currentStar;
+  const stage = STAGES[level];
+
+  if (result.success) {
+    const newLevel = level + 1;
+    const nextStage = STAGES[newLevel];
+    showOverlay('✨ 강화 성공!', 'success', `${nextStage.name} (+${newLevel}강)으로 강화되었습니다!`);
+    showConfirmButton();
+    document.getElementById('btn-confirm').onclick = async () => {
+      hideOverlay();
+      await reload();
+    };
+  } else {
+    // 실패
+    pendingState = {
+      failed: true,
+      drop: result.drop,
+      dropPickedUp: false,
+      needFallback: level >= 4 && stage.protectionCost !== 0, // 0강~3강은 하락 없음
+    };
+
+    showOverlay('💥 강화 실패', 'fail', `${stage.name} (+${level}강) 강화에 실패했습니다.`);
+    advanceFailureFlow();
+  }
+});
+
+/** 실패 후 단계별로 줍기 → 방지권 → 확인 순으로 진행 */
+async function advanceFailureFlow() {
+  // 1단계: 드랍 아이템 줍기
+  if (pendingState.drop && !pendingState.dropPickedUp) {
+    const drop = pendingState.drop;
+    const pickupSection = document.getElementById('pickup-section');
+    const btnPickup     = document.getElementById('btn-pickup');
+    btnPickup.textContent = `줍기 — ${ITEM_NAMES[drop.key]} ${drop.amount}개`;
+    pickupSection.style.display = '';
+
+    btnPickup.onclick = async () => {
+      pickupSection.style.display = 'none';
+      await pickupItem(currentUser, drop.key, drop.amount);
+      pendingState.dropPickedUp = true;
+      showToast(`${ITEM_NAMES[drop.key]} ${drop.amount}개를 주웠습니다.`);
+      advanceFailureFlow();
+    };
+    return;
+  }
+
+  // 2단계: 방지권 선택 (하락 위기 + 방지권 보유 시)
+  if (pendingState.needFallback) {
+    const level = currentUser.currentStar;
+    const stage = STAGES[level];
+    const canProtect = stage.protectionCost > 0 && (currentUser.protectionScrolls || 0) >= stage.protectionCost;
+
+    if (canProtect) {
+      const protSection = document.getElementById('protection-section');
+      document.getElementById('protection-desc').textContent =
+        `방지권 ${stage.protectionCost}개를 사용하면 +${level}강을 유지할 수 있습니다. (보유: ${currentUser.protectionScrolls})`;
+      protSection.style.display = '';
+
+      document.getElementById('btn-use-protection').onclick = async () => {
+        protSection.style.display = 'none';
+        const res = await useProtectionScroll(currentUser);
+        if (res.ok) {
+          showToast(`방지권 ${stage.protectionCost}개 소모 — 단계 유지!`);
+          pendingState.needFallback = false;
+        } else {
+          showToast(res.error || '방지 실패');
+          // 방지 실패 시 하락 처리
+          await applyFallback(currentUser);
+        }
+        showConfirmButton();
+        document.getElementById('btn-confirm').onclick = async () => {
+          hideOverlay();
+          await reload();
+        };
+      };
+
+      document.getElementById('btn-skip-protection').onclick = async () => {
+        protSection.style.display = 'none';
+        await applyFallback(currentUser);
+        pendingState.needFallback = false;
+        showConfirmButton();
+        document.getElementById('btn-confirm').onclick = async () => {
+          hideOverlay();
+          await reload();
+        };
+      };
+      return;
+    } else {
+      // 방지권 없거나 방지 불가 → 즉시 하락
+      await applyFallback(currentUser);
+    }
+  }
+
+  // 3단계: 확인 버튼
+  showConfirmButton();
+  document.getElementById('btn-confirm').onclick = async () => {
+    hideOverlay();
+    await reload();
+  };
+}
+
+// ─── 판매 ──────────────────────────────────────────
+
+async function handleSell() {
+  if (!currentUser) return;
+  const stage = STAGES[currentUser.currentStar];
+  if (!stage || !stage.sellPrice) return;
+
+  if (!confirm(`+${currentUser.currentStar}강 별(${stage.name})을 ${formatNumber(stage.sellPrice)} 수소에 판매하시겠습니까?`)) return;
+
+  const result = await sellStar(currentUser);
+  if (result.ok) {
+    showToast(`${stage.name}을 ${formatNumber(result.gained)} 수소에 판매했습니다.`);
+    await reload();
+  }
+}
+
+// ─── 보관 ──────────────────────────────────────────
+
+document.getElementById('btn-store').addEventListener('click', async () => {
+  if (!currentUser) return;
+  const level = currentUser.currentStar;
+  if (level < 1) return;
+
+  const stage = STAGES[level];
+  if (!confirm(`+${level}강 별(${stage.name})을 보관하시겠습니까?\n보관된 별은 조합소에서 사용할 수 있습니다.`)) return;
+
+  const result = await storeStar(currentUser);
+  if (result.ok) {
+    showToast(`${stage.name}(+${level}강) 1개를 보관했습니다.`);
+    await reload();
+  }
+});
+
+// ─── 로그아웃 ──────────────────────────────────────
+
+document.getElementById('nav-logout').addEventListener('click', (e) => {
+  e.preventDefault();
+  if (confirm('로그아웃하시겠습니까?')) {
+    clearSession();
+    location.href = 'login.html';
+  }
+});
+
+// ─── 토스트 알림 ────────────────────────────────────
+
+function showToast(msg) {
+  // style.css에 .toast 정의 있음 — 동적 생성
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  // 강제 reflow 후 show
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => t.classList.add('show'));
+  });
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 350);
+  }, 2200);
+}
+
+// ─── 데이터 새로고침 ────────────────────────────────
+
+async function reload() {
+  const user = await loadCurrentUser();
+  if (!user) {
+    clearSession();
+    location.href = 'login.html';
+    return;
+  }
+  updateUI(user);
+}
+
+// ─── 초기 로드 ──────────────────────────────────────
+
+(async () => {
+  await reload();
+})();
+</script>
+</body>
+</html>

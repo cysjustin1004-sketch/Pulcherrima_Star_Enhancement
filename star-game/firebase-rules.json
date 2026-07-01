@@ -1,0 +1,51 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        // 본인만 읽기/쓰기 가능 (Firebase Auth 미사용 → 임시 오픈, 이하 조건으로 보완)
+        ".read": true,
+        ".write": true,
+
+        "bestStar": {
+          // bestStar는 감소 불가
+          ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0)"
+        },
+        "hydrogen": {
+          // 음수 불가
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "currentStar": {
+          // ±1 범위 변경만 허용 (도약권 등 예외는 관리자 or 클라이언트 검증)
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 29"
+        },
+        "protectionScrolls": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        }
+      }
+    },
+
+    "enhanceLogs": {
+      "$uid": {
+        // 로그 읽기: 본인 + 관리자 (관리자는 admin.html에서 직접 접근)
+        ".read": true,
+        // 새 항목 추가만 허용 (push), 기존 항목 수정/삭제 불가
+        "$logId": {
+          ".write": "!data.exists()",
+          ".validate": "newData.hasChildren(['from','to','result','timeMs'])"
+        }
+      }
+    },
+
+    "config": {
+      // 관리자 비밀번호 해시 — 읽기/쓰기 모두 허용 (클라이언트 측 보안)
+      ".read": true,
+      ".write": true
+    },
+
+    // 기타 경로 차단
+    "$other": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}

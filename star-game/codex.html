@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>도감 — 별 강화하기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- 도감 상세 모달 -->
+<div class="codex-modal-bg" id="codex-modal-bg" onclick="handleModalBgClick(event)">
+  <div class="codex-modal">
+    <div class="codex-modal-level" id="modal-level">+0강</div>
+    <div style="margin: 0.75rem auto 0.75rem; width:56px; height:56px;" id="modal-star-visual"></div>
+    <div class="codex-modal-name" id="modal-name"></div>
+    <div class="codex-modal-sub"  id="modal-sub"></div>
+    <div class="codex-modal-desc" id="modal-desc"></div>
+    <button class="btn-secondary codex-modal-close" style="width:100%;"
+      onclick="document.getElementById('codex-modal-bg').classList.remove('visible')">닫기</button>
+  </div>
+</div>
+
+<div class="page">
+  <h1 class="page-title">📖 도감</h1>
+  <div style="font-size:0.82rem; color:var(--text-sub); text-align:center; margin-bottom:1rem;" id="unlock-count">
+    해금: 로딩 중...
+  </div>
+
+  <!-- 도감 목록 -->
+  <div class="codex-grid" id="codex-grid"></div>
+</div>
+
+<!-- 하단 네비게이션 -->
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html">
+    <span class="nav-icon">⭐</span>강화
+  </a>
+  <a class="nav-item active" href="codex.html">
+    <span class="nav-icon">📖</span>도감
+  </a>
+  <a class="nav-item" href="ranking.html">
+    <span class="nav-icon">🏆</span>랭킹
+  </a>
+  <a class="nav-item" href="#" id="nav-logout">
+    <span class="nav-icon">🚪</span>로그아웃
+  </a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="firebase.js"></script>
+<script src="auth.js"></script>
+<script src="game.js"></script>
+<script>
+const session = requireAuth();
+if (!session) throw new Error('no session');
+
+function handleModalBgClick(e) {
+  // 배경(bg) 클릭 시만 닫기 — 모달 내부 클릭은 무시
+  if (e.target === document.getElementById('codex-modal-bg')) {
+    document.getElementById('codex-modal-bg').classList.remove('visible');
+  }
+}
+
+function openEntry(level) {
+  const stage = STAGES[level];
+  document.getElementById('modal-level').textContent = `+${level}강`;
+  document.getElementById('modal-name').textContent  = stage.name;
+  document.getElementById('modal-sub').textContent   = `${stage.subname} · ${stage.type}`;
+  document.getElementById('modal-desc').textContent  = stage.codexDescription;
+
+  const visualEl = document.getElementById('modal-star-visual');
+  visualEl.innerHTML = `<div class="star-core ${getStarCssClass(level)}" style="width:56px;height:56px;"></div>`;
+
+  document.getElementById('codex-modal-bg').classList.add('visible');
+}
+
+async function renderCodex() {
+  const user = await loadCurrentUser();
+  if (!user) { clearSession(); location.href = 'login.html'; return; }
+
+  const unlocked = user.unlockedCodex || [];
+  document.getElementById('unlock-count').textContent =
+    `해금: ${unlocked.length} / ${STAGES.length}`;
+
+  const grid = document.getElementById('codex-grid');
+  grid.innerHTML = '';
+
+  STAGES.forEach((stage, level) => {
+    const isUnlocked = unlocked.includes(level);
+
+    const item = document.createElement('div');
+    item.className = 'codex-item ' + (isUnlocked ? 'unlocked' : 'locked');
+
+    item.innerHTML = `
+      <div class="codex-level-badge">+${level}</div>
+      <div style="flex-shrink:0;">
+        ${isUnlocked
+          ? `<div class="star-core ${getStarCssClass(level)}" style="width:36px;height:36px;"></div>`
+          : '<div style="font-size:1.5rem; color:var(--text-sub);">?</div>'}
+      </div>
+      <div class="codex-info">
+        <div class="codex-name">${isUnlocked ? stage.name : '???'}</div>
+        <div class="codex-type">${isUnlocked ? stage.type : '미해금'}</div>
+      </div>
+    `;
+
+    if (isUnlocked) {
+      item.addEventListener('click', () => openEntry(level));
+    }
+
+    grid.appendChild(item);
+  });
+}
+
+document.getElementById('nav-logout').addEventListener('click', e => {
+  e.preventDefault();
+  if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
+});
+
+(async () => { await renderCodex(); })();
+</script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>조합소 — 별 강화하기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="page">
+  <h1 class="page-title">🔧 조합소</h1>
+
+  <!-- 인벤토리 요약 -->
+  <div class="card" id="inventory-card">
+    <div class="card-title">보유 아이템</div>
+    <div id="inventory-list" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
+  </div>
+
+  <!-- 보관된 별 -->
+  <div class="card" id="stored-stars-card">
+    <div class="card-title">보관된 별</div>
+    <div id="stored-stars-list" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
+  </div>
+
+  <!-- 레시피 목록 -->
+  <div class="card-title" style="padding:0.25rem 0 0.5rem; font-size:0.78rem; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.07em;">레시피</div>
+  <div id="recipe-list"></div>
+</div>
+
+<!-- 하단 네비게이션 -->
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html">
+    <span class="nav-icon">⭐</span>강화
+  </a>
+  <a class="nav-item" href="codex.html">
+    <span class="nav-icon">📖</span>도감
+  </a>
+  <a class="nav-item" href="ranking.html">
+    <span class="nav-icon">🏆</span>랭킹
+  </a>
+  <a class="nav-item" href="#" id="nav-logout">
+    <span class="nav-icon">🚪</span>로그아웃
+  </a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="firebase.js"></script>
+<script src="auth.js"></script>
+<script src="game.js"></script>
+<script>
+const session = requireAuth();
+if (!session) throw new Error('no session');
+
+let currentUser = null;
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 2200);
+}
+
+function formatOutputDesc(output) {
+  if (output.type === 'protection') return `붕괴 방지권 ${output.amount}개`;
+  if (output.type === 'star') {
+    const stage = STAGES[output.level];
+    return `${stage ? stage.name : ''}(+${output.level}강) 별 1개`;
+  }
+  return '?';
+}
+
+function renderAll(user) {
+  currentUser = user;
+
+  // ── 인벤토리 표시 ──
+  const invList = document.getElementById('inventory-list');
+  invList.innerHTML = '';
+  Object.entries(ITEM_NAMES).forEach(([key, name]) => {
+    const count = (user.items && user.items[key]) || 0;
+    const warning = IMPORTANT_ITEM_WARNINGS[key] || '';
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;';
+    row.innerHTML = `
+      <span>${name}${warning ? ' <span style="font-size:0.75rem; color:var(--danger);">⚠</span>' : ''}</span>
+      <span style="font-weight:700; color:${count > 0 ? 'var(--accent)' : 'var(--text-sub)'};">${count}개</span>
+    `;
+    if (warning && count > 0) {
+      const warnEl = document.createElement('div');
+      warnEl.style.cssText = 'font-size:0.75rem; color:var(--danger); margin-top:2px;';
+      warnEl.textContent = warning;
+      // 경고 행을 별도로 추가
+      const wrapper = document.createElement('div');
+      wrapper.appendChild(row);
+      wrapper.appendChild(warnEl);
+      invList.appendChild(wrapper);
+    } else {
+      invList.appendChild(row);
+    }
+  });
+
+  // ── 보관된 별 ──
+  const starList = document.getElementById('stored-stars-list');
+  starList.innerHTML = '';
+  const stored = user.storedStars || {};
+  const storedEntries = Object.entries(stored).filter(([, cnt]) => cnt > 0);
+  if (storedEntries.length === 0) {
+    starList.innerHTML = '<div style="font-size:0.85rem; color:var(--text-sub);">보관된 별이 없습니다.</div>';
+  } else {
+    storedEntries.forEach(([level, cnt]) => {
+      const stage = STAGES[parseInt(level)];
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;';
+      row.innerHTML = `
+        <span>${stage ? stage.name : '?'}(+${level}강)</span>
+        <span style="font-weight:700; color:var(--accent);">${cnt}개</span>
+      `;
+      starList.appendChild(row);
+    });
+  }
+
+  // ── 레시피 목록 ──
+  const recipeList = document.getElementById('recipe-list');
+  recipeList.innerHTML = '';
+  RECIPES.forEach(recipe => {
+    const canCraft = recipe.inputs.every(inp => {
+      const held = (user.items && user.items[inp.key]) || 0;
+      return held >= inp.amount;
+    });
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    const inputText = recipe.inputs.map(inp =>
+      `${ITEM_NAMES[inp.key]} ${inp.amount}개`
+    ).join(' + ');
+
+    card.innerHTML = `
+      <div style="font-size:0.88rem; color:var(--text-sub); margin-bottom:0.4rem;">${inputText}</div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="font-size:0.95rem; font-weight:700; color:var(--accent);">→ ${formatOutputDesc(recipe.output)}</div>
+        <button class="btn-success" style="font-size:0.85rem; padding:0.5rem 0.9rem;" data-id="${recipe.id}" ${canCraft ? '' : 'disabled'}>
+          조합
+        </button>
+      </div>
+    `;
+
+    card.querySelector('button').addEventListener('click', () => handleCraft(recipe));
+    recipeList.appendChild(card);
+  });
+}
+
+async function handleCraft(recipe) {
+  if (!currentUser) return;
+
+  // 재료 재확인
+  for (const inp of recipe.inputs) {
+    const held = (currentUser.items && currentUser.items[inp.key]) || 0;
+    if (held < inp.amount) {
+      showToast(`${ITEM_NAMES[inp.key]}이(가) 부족합니다.`);
+      return;
+    }
+  }
+
+  // 재료 차감
+  const itemUpdates = {};
+  for (const inp of recipe.inputs) {
+    const held = (currentUser.items && currentUser.items[inp.key]) || 0;
+    itemUpdates[inp.key] = held - inp.amount;
+  }
+  await dbUpdate(`users/${currentUser.userKey}/items`, itemUpdates);
+
+  // 결과 지급
+  const output = recipe.output;
+  if (output.type === 'protection') {
+    await dbUpdate(`users/${currentUser.userKey}`, {
+      protectionScrolls: (currentUser.protectionScrolls || 0) + output.amount,
+    });
+    showToast(`붕괴 방지권 ${output.amount}개 획득!`);
+  } else if (output.type === 'star') {
+    const storedCount = (currentUser.storedStars && currentUser.storedStars[output.level]) || 0;
+    await dbUpdate(`users/${currentUser.userKey}/storedStars`, {
+      [output.level]: storedCount + 1,
+    });
+    const stageName = STAGES[output.level] ? STAGES[output.level].name : `+${output.level}강`;
+    showToast(`${stageName}(+${output.level}강) 별 1개 획득!`);
+  }
+
+  await reload();
+}
+
+async function reload() {
+  const user = await loadCurrentUser();
+  if (!user) { clearSession(); location.href = 'login.html'; return; }
+  renderAll(user);
+}
+
+document.getElementById('nav-logout').addEventListener('click', e => {
+  e.preventDefault();
+  if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
+});
+
+(async () => { await reload(); })();
+</script>
+</body>
+</html>

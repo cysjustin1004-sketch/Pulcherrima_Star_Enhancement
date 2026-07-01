@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>랭킹 — 별 강화하기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="page">
+  <h1 class="page-title">🏆 랭킹</h1>
+  <div style="font-size:0.82rem; color:var(--text-sub); text-align:center; margin-bottom:1rem;">
+    bestStar 기준 상위 50명
+  </div>
+
+  <div class="rank-list" id="rank-list">
+    <div style="text-align:center; color:var(--text-sub); padding:2rem;">로딩 중...</div>
+  </div>
+</div>
+
+<!-- 하단 네비게이션 -->
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html">
+    <span class="nav-icon">⭐</span>강화
+  </a>
+  <a class="nav-item" href="codex.html">
+    <span class="nav-icon">📖</span>도감
+  </a>
+  <a class="nav-item active" href="ranking.html">
+    <span class="nav-icon">🏆</span>랭킹
+  </a>
+  <a class="nav-item" href="#" id="nav-logout">
+    <span class="nav-icon">🚪</span>로그아웃
+  </a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="firebase.js"></script>
+<script src="auth.js"></script>
+<script src="game.js"></script>
+<script>
+const session = requireAuth();
+if (!session) throw new Error('no session');
+
+async function renderRanking() {
+  const list = document.getElementById('rank-list');
+  list.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:2rem;">로딩 중...</div>';
+
+  // Firebase: bestStar 내림차순, 상위 50명 쿼리
+  const snap = await firebase.database()
+    .ref('users')
+    .orderByChild('bestStar')
+    .limitToLast(50)
+    .get();
+
+  if (!snap.exists()) {
+    list.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:2rem;">아직 랭킹 데이터가 없습니다.</div>';
+    return;
+  }
+
+  // Firebase 결과는 오름차순 → 내림차순으로 반전
+  const users = [];
+  snap.forEach(child => {
+    const d = child.val();
+    users.push({ nickname: d.nickname, bestStar: d.bestStar || 0 });
+  });
+  users.sort((a, b) => b.bestStar - a.bestStar);
+
+  list.innerHTML = '';
+  users.forEach((u, i) => {
+    const rank     = i + 1;
+    const stage    = STAGES[u.bestStar] || STAGES[0];
+    const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+
+    const item = document.createElement('div');
+    item.className = 'rank-item';
+    item.innerHTML = `
+      <div class="rank-num">${rankIcon || rank}</div>
+      <div class="rank-info">
+        <div class="rank-nickname">${escapeHtml(u.nickname)}</div>
+        <div class="rank-star">+${u.bestStar}강 · ${stage.name}</div>
+      </div>
+      <div class="rank-level">+${u.bestStar}</div>
+    `;
+
+    // 내 항목 강조
+    if (u.nickname === session.nickname) {
+      item.style.borderColor = 'var(--accent)';
+    }
+
+    list.appendChild(item);
+  });
+
+  if (users.length === 0) {
+    list.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:2rem;">아직 랭킹 데이터가 없습니다.</div>';
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+document.getElementById('nav-logout').addEventListener('click', e => {
+  e.preventDefault();
+  if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
+});
+
+(async () => { await renderRanking(); })();
+</script>
+</body>
+</html>

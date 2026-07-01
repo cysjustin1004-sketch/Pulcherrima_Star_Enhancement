@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>상점 — 별 강화하기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="page">
+  <h1 class="page-title">⭐ 상점</h1>
+
+  <!-- 수소 잔액 -->
+  <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+    <span style="color:var(--text-sub); font-size:0.9rem;">보유 수소 💧</span>
+    <span style="font-size:1.1rem; font-weight:700; color:var(--accent);" id="stat-hydrogen">...</span>
+  </div>
+
+  <!-- 아이템 목록 (config.js SHOP_ITEMS 기반 렌더링) -->
+  <div id="shop-list"></div>
+</div>
+
+<!-- 하단 네비게이션 -->
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html">
+    <span class="nav-icon">⭐</span>강화
+  </a>
+  <a class="nav-item" href="codex.html">
+    <span class="nav-icon">📖</span>도감
+  </a>
+  <a class="nav-item" href="ranking.html">
+    <span class="nav-icon">🏆</span>랭킹
+  </a>
+  <a class="nav-item" href="#" id="nav-logout">
+    <span class="nav-icon">🚪</span>로그아웃
+  </a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="firebase.js"></script>
+<script src="auth.js"></script>
+<script src="game.js"></script>
+<script>
+const session = requireAuth();
+if (!session) throw new Error('no session');
+
+let currentUser = null;
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 2200);
+}
+
+function renderShop(user) {
+  currentUser = user;
+  document.getElementById('stat-hydrogen').textContent = formatNumber(user.hydrogen || 0);
+
+  const list = document.getElementById('shop-list');
+  list.innerHTML = '';
+
+  SHOP_ITEMS.forEach(item => {
+    const canBuy = (user.hydrogen || 0) >= item.price;
+
+    const card = document.createElement('div');
+    card.className = 'card shop-item';
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+        <div>
+          <div style="font-weight:700; margin-bottom:0.3rem;">${item.name}</div>
+          <div style="font-size:0.83rem; color:var(--text-sub);">${item.desc}</div>
+        </div>
+        <div style="text-align:right; flex-shrink:0;">
+          <div style="font-size:0.9rem; font-weight:700; color:${canBuy ? 'var(--accent)' : 'var(--danger)'}; white-space:nowrap;">
+            ${formatNumber(item.price)} 수소
+          </div>
+        </div>
+      </div>
+      <button class="btn-blue" style="width:100%; margin-top:0.75rem;" data-id="${item.id}" ${canBuy ? '' : 'disabled'}>
+        구매하기
+      </button>
+    `;
+
+    card.querySelector('button').addEventListener('click', () => handleBuy(item));
+    list.appendChild(card);
+  });
+}
+
+async function handleBuy(item) {
+  if (!currentUser) return;
+  if ((currentUser.hydrogen || 0) < item.price) {
+    showToast('수소가 부족합니다.');
+    return;
+  }
+
+  // 도약권: 현재 단계보다 낮은 목표 단계면 의미 없음
+  if (item.type === 'warp' && currentUser.currentStar >= item.targetLevel) {
+    showToast('현재 단계보다 낮은 도약권은 사용할 수 없습니다.');
+    return;
+  }
+
+  const newHydrogen = (currentUser.hydrogen || 0) - item.price;
+  const updates = { hydrogen: newHydrogen };
+
+  if (item.type === 'warp') {
+    updates.currentStar = item.targetLevel;
+    // 도감 해금 (중간 단계들도 해금)
+    const unlocked = currentUser.unlockedCodex || [];
+    const newUnlocked = [...unlocked];
+    for (let i = 1; i <= item.targetLevel; i++) {
+      if (!newUnlocked.includes(i)) newUnlocked.push(i);
+    }
+    updates.unlockedCodex = newUnlocked;
+    // bestStar 갱신
+    if (item.targetLevel > (currentUser.bestStar || 0)) {
+      updates.bestStar = item.targetLevel;
+    }
+  } else if (item.type === 'protection') {
+    updates.protectionScrolls = (currentUser.protectionScrolls || 0) + item.amount;
+  }
+
+  await dbUpdate(`users/${currentUser.userKey}`, updates);
+  showToast(`${item.name} 구매 완료!`);
+  await reload();
+}
+
+async function reload() {
+  const user = await loadCurrentUser();
+  if (!user) { clearSession(); location.href = 'login.html'; return; }
+  renderShop(user);
+}
+
+document.getElementById('nav-logout').addEventListener('click', e => {
+  e.preventDefault();
+  if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
+});
+
+(async () => { await reload(); })();
+</script>
+</body>
+</html>

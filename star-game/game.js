@@ -152,8 +152,8 @@ async function applyFallback(user) {
   const stage = STAGES[user.currentStar];
   if (!stage || stage.protectionCost === 0) return; // 하락 없는 구간
 
-  const newLevel = Math.max(0, user.currentStar - 1);
-  await dbUpdate(`users/${user.userKey}`, { currentStar: newLevel });
+  // 실패 시 +0으로 초기화 (방지권 미사용)
+  await dbUpdate(`users/${user.userKey}`, { currentStar: 0 });
 }
 
 // ─── 드랍 아이템 줍기 ────────────────────────────────────────
@@ -209,8 +209,6 @@ async function storeStar(user) {
 
 function formatNumber(n) {
   if (n === null || n === undefined) return '-';
-  if (n >= 1e8) return (n / 1e8).toFixed(1).replace(/\.0$/, '') + '억';
-  if (n >= 1e4) return (n / 1e4).toFixed(1).replace(/\.0$/, '') + '만';
   return n.toLocaleString();
 }
 

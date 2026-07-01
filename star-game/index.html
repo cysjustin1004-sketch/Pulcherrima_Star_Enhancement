@@ -337,14 +337,8 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
   const stage = STAGES[level];
 
   if (result.success) {
-    const newLevel = level + 1;
-    const nextStage = STAGES[newLevel];
-    showOverlay('✨ 강화 성공!', 'success', `${nextStage.name} (+${newLevel}강)으로 강화되었습니다!`);
-    showConfirmButton();
-    document.getElementById('btn-confirm').onclick = async () => {
-      hideOverlay();
-      await reload();
-    };
+    // 성공 시 오버레이 없이 바로 UI 갱신
+    await reload();
   } else {
     // 실패
     pendingState = {

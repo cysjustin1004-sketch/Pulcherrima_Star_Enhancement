@@ -1,0 +1,64 @@
+=== Allsky AP 모드 설치 가이드 ===
+
+[ 1단계: 이 파일(allsky-master-ap.zip)을 라즈베리파이로 전송 ]
+
+방법 A - WinSCP 사용 (GUI, 추천):
+  1. WinSCP 설치: https://winscp.net/
+  2. 새 세션 > SFTP, 호스트: 192.168.32.1, 사용자: pi
+  3. allsky-master-ap.zip 을 /home/pi/ 로 드래그&드롭
+
+방법 B - scp 명령어 (PowerShell):
+  scp "C:\Users\flyer\my-first-vibe\allsky-ap-mod\allsky-master-ap.zip" pi@192.168.32.1:/home/pi/
+
+[ 2단계: 라즈베리파이에서 - AP 모드 일시 중지 후 인터넷 연결 ]
+
+  sudo systemctl stop hostapd dnsmasq
+  # 그 후 raspi-config 로 일반 WiFi 연결 (Network Options > Wireless LAN)
+  sudo raspi-config
+
+[ 3단계: 라즈베리파이에서 - allsky 설치 ]
+
+  cd /home/pi
+  unzip allsky-master-ap.zip
+  cd allsky-master
+  ./install.sh
+
+  # 설치 중 카메라 타입 선택 시 RPi (라즈베리파이 공식 카메라) 선택
+
+[ 4단계: 라즈베리파이에서 - AP 모드 복구 ]
+
+  sudo systemctl start hostapd dnsmasq
+  # 또는 재부팅: sudo reboot
+
+[ 5단계: 접속 확인 ]
+
+  PC/스마트폰 WiFi에서 AP 네트워크 재접속
+  브라우저 주소창: http://192.168.32.1/allsky/
+
+=== 수정된 파일 목록 (3개) ===
+
+1. html/allsky/getForecast.php
+   - NOAA Aurora API 호출에 5초 타임아웃 추가
+   - 실패 시 친화적 메시지 반환 (UI 오류 없음)
+
+2. html/allsky/js/controller.js
+   - Aurora 예보 이미지(NOAA) 로드 실패 시 조용히 무시
+   - getForecast.php 요청 실패 시 .catch() 로 조용히 무시
+
+3. scripts/utilities/getNewestAllskyVersion.sh
+   - GitHub 버전 체크 curl에 5초 타임아웃 추가
+   - 실패 시 현재 설치 버전 반환 후 정상 종료 (오류 로그 없음)
+
+=== 정상 동작하는 기능 (인터넷 없이) ===
+  - 실시간 카메라 이미지 자동 갱신
+  - 오늘 찍은 이미지 갤러리
+  - 타임랩스 영상
+  - Keogram, Startrails
+  - 별자리 오버레이 (virtualsky)
+  - 일출/일몰 시간 (로컬 계산)
+
+=== 나중에 인터넷 추가 시 ===
+  랜선(eth0)만 연결하면 아래 기능 자동 동작:
+  - Aurora KP 예보
+  - Aurora 오버레이 이미지
+  - 버전 업데이트 알림

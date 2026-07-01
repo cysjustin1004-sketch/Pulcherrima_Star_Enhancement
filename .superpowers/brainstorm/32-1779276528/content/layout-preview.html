@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>프로필 사이트 레이아웃 목업</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: #0f172a;
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+    gap: 2.5rem;
+  }
+
+  h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #94a3b8;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.75rem;
+  }
+
+  /* ── MOCKUP WRAPPER ── */
+  .mockup-frame {
+    width: 100%;
+    max-width: 780px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  /* ── SITE BG ── */
+  .site {
+    position: relative;
+    min-height: 520px;
+    background: linear-gradient(135deg, #bfdbfe 0%, #eff6ff 50%, #dbeafe 100%);
+    overflow: hidden;
+  }
+
+  /* floating blur blobs */
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.55;
+  }
+  .blob-1 { width: 320px; height: 320px; background: #93c5fd; top: -80px; left: -60px; }
+  .blob-2 { width: 260px; height: 260px; background: #a5f3fc; bottom: -60px; right: -40px; }
+  .blob-3 { width: 180px; height: 180px; background: #c4b5fd; top: 40%; left: 55%; }
+
+  /* ── HEADER ── */
+  .site-header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.75rem;
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-bottom: 1px solid rgba(255,255,255,0.5);
+  }
+
+  .site-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e3a8a;
+  }
+
+  .site-tabs {
+    display: flex;
+    gap: 0.25rem;
+    background: rgba(255,255,255,0.4);
+    border-radius: 999px;
+    padding: 0.3rem;
+  }
+
+  .tab {
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #3b82f6;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .tab.active {
+    background: #2563eb;
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.4);
+  }
+
+  /* ── TAB CONTENT ── */
+  .tab-content {
+    position: relative;
+    z-index: 5;
+    padding: 2.5rem 2rem;
+    display: none;
+  }
+  .tab-content.active { display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+
+  /* ── 소개 ── */
+  .profile-avatar {
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.4rem;
+    box-shadow: 0 8px 24px rgba(37,99,235,0.35);
+    border: 3px solid rgba(255,255,255,0.7);
+  }
+
+  .profile-name {
+    font-size: 1.5rem;
+    font-weight: 900;
+    color: #1e3a8a;
+  }
+
+  .profile-school {
+    font-size: 0.85rem;
+    color: #2563eb;
+    font-weight: 500;
+  }
+
+  .badges {
+    display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;
+  }
+
+  .badge {
+    display: flex; align-items: center; gap: 0.3rem;
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 999px;
+    padding: 0.35rem 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #1e40af;
+    box-shadow: 0 2px 8px rgba(37,99,235,0.1);
+  }
+
+  .bio-card {
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.75);
+    border-radius: 16px;
+    padding: 1rem 1.5rem;
+    font-size: 0.9rem;
+    color: #334155;
+    text-align: center;
+    max-width: 420px;
+    box-shadow: 0 4px 20px rgba(37,99,235,0.08);
+  }
+
+  /* ── 갤러리 ── */
+  .gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .gallery-item {
+    aspect-ratio: 1;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.65);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 4px 16px rgba(37,99,235,0.1);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem;
+    color: rgba(37,99,235,0.25);
+    font-weight: 300;
+  }
+
+  /* ── 링크 ── */
+  .link-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .link-item {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    background: rgba(255,255,255,0.6);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.75);
+    border-radius: 14px;
+    padding: 0.85rem 1.1rem;
+    box-shadow: 0 4px 16px rgba(37,99,235,0.08);
+  }
+
+  .link-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .link-icon.ig { background: linear-gradient(135deg, #f43f5e, #a855f7); }
+  .link-icon.tw { background: #0f172a; }
+  .link-icon.etc { background: #2563eb; }
+
+  .link-text { flex: 1; }
+  .link-platform { font-size: 0.75rem; color: #64748b; }
+  .link-handle { font-size: 0.92rem; font-weight: 600; color: #1e3a8a; }
+  .link-arrow { color: #94a3b8; font-size: 0.9rem; }
+
+  /* ── ANNOTATIONS ── */
+  .annotations {
+    width: 100%;
+    max-width: 780px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .ann {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 1rem;
+  }
+
+  .ann-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #60a5fa;
+    margin-bottom: 0.4rem;
+  }
+
+  .ann-desc {
+    font-size: 0.78rem;
+    color: #94a3b8;
+    line-height: 1.5;
+  }
+
+  /* Tab switching JS */
+</style>
+</head>
+<body>
+
+<h1>프로필 사이트 — 글래스모피즘 목업</h1>
+
+<div class="mockup-frame">
+  <div class="site" id="site">
+
+    <!-- blobs -->
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+
+    <!-- header -->
+    <div class="site-header">
+      <div class="site-name">내 이름</div>
+      <div class="site-tabs">
+        <div class="tab active" onclick="switchTab('intro',this)">소개</div>
+        <div class="tab" onclick="switchTab('gallery',this)">갤러리</div>
+        <div class="tab" onclick="switchTab('links',this)">링크 모음</div>
+      </div>
+    </div>
+
+    <!-- 소개 -->
+    <div class="tab-content active" id="tab-intro">
+      <div class="profile-avatar">🙂</div>
+      <div class="profile-name">홍길동</div>
+      <div class="profile-school">경기북과학고등학교 2학년</div>
+      <div class="badges">
+        <span class="badge">🏃 운동</span>
+        <span class="badge">🎮 게임</span>
+      </div>
+      <div class="bio-card">여기에 짧은 자기소개를 쓸 수 있어요. 좋아하는 것, 목표, 하고 싶은 말 등.</div>
+    </div>
+
+    <!-- 갤러리 -->
+    <div class="tab-content" id="tab-gallery">
+      <div class="gallery-grid">
+        <div class="gallery-item">📷</div>
+        <div class="gallery-item">📷</div>
+        <div class="gallery-item">📷</div>
+        <div class="gallery-item">📷</div>
+        <div class="gallery-item">📷</div>
+        <div class="gallery-item">📷</div>
+        <div class="gallery-item">📷</div>
+        <div class="gallery-item">📷</div>
+        <div class="gallery-item">📷</div>
+      </div>
+    </div>
+
+    <!-- 링크 모음 -->
+    <div class="tab-content" id="tab-links">
+      <div class="link-list">
+        <div class="link-item">
+          <div class="link-icon ig">📸</div>
+          <div class="link-text">
+            <div class="link-platform">Instagram</div>
+            <div class="link-handle">@username</div>
+          </div>
+          <span class="link-arrow">→</span>
+        </div>
+        <div class="link-item">
+          <div class="link-icon tw">🐦</div>
+          <div class="link-text">
+            <div class="link-platform">Twitter / X</div>
+            <div class="link-handle">@username</div>
+          </div>
+          <span class="link-arrow">→</span>
+        </div>
+        <div class="link-item">
+          <div class="link-icon etc">＋</div>
+          <div class="link-text">
+            <div class="link-platform">추가 링크</div>
+            <div class="link-handle">원하는 것 추가 가능</div>
+          </div>
+          <span class="link-arrow">→</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Annotations -->
+<div class="annotations">
+  <div class="ann">
+    <div class="ann-title">배경</div>
+    <div class="ann-desc">파란 그라데이션 + 흐린 원형 블러 도형으로 빛이 번지는 느낌</div>
+  </div>
+  <div class="ann">
+    <div class="ann-title">글래스 카드</div>
+    <div class="ann-desc">반투명 흰색 + backdrop-filter blur. 탭, 카드, 링크 모두 동일 적용</div>
+  </div>
+  <div class="ann">
+    <div class="ann-title">탭 전환</div>
+    <div class="ann-desc">상단 탭 클릭 시 페이드인 전환. 지금 이 목업에서도 직접 눌러볼 수 있어요</div>
+  </div>
+</div>
+
+<script>
+function switchTab(name, el) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  el.classList.add('active');
+}
+</script>
+
+</body>
+</html>

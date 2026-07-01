@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Pan-Tilt SQM 알고리즘 순서도</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body {
+    font-family: "Malgun Gothic", sans-serif;
+    background: #f7f7f7;
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+  }
+  .mermaid {
+    background: #ffffff;
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+</style>
+</head>
+<body>
+<h1>Pan-Tilt SQM 알고리즘 순서도</h1>
+
+<div class="mermaid">
+flowchart TD
+    A[전원 ON] --> B[setup 시작]
+    B --> C["Pan/Tilt 서보 attach"]
+    C --> D["홈 포지션 이동<br/>(Pan:90, Tilt:45)"]
+    D --> E["Wire.begin / TSL2591 초기화"]
+    E --> F{"TSL2591 인식?"}
+    F -- 실패 --> G["에러 메시지 출력 후<br/>무한 대기 (정지)"]
+    F -- 성공 --> H["게인/적분시간 설정"]
+    H --> I["LCD 초기화<br/>'Pan-Tilt SQM / Scanning...'"]
+    I --> J[loop 시작]
+
+    J --> K["Pan = 0,30,...,180<br/>Tilt = 0,15,30<br/>(7 x 3 = 21포인트)"]
+    K --> L["해당 각도로 서보 이동<br/>+ 안정화 대기"]
+    L --> M["TSL2591 측정 → VIS 계산"]
+    M --> N["VIS → SQM 계산"]
+    N --> O{"SQM 유효?<br/>vis > 0"}
+    O -- 유효 --> P["시리얼/LCD에 SQM 출력<br/>평균 누적(sqmSum, sqmCount)"]
+    O -- 무효 --> Q["시리얼/LCD에 'SQM:N/A' 출력<br/>(평균 누적 제외)"]
+    P --> R{"21포인트<br/>모두 측정?"}
+    Q --> R
+    R -- 아니오 --> K
+    R -- 예 --> S["'SCAN DONE / 21 points'<br/>LCD 표시 (2초)"]
+    S --> T{"유효 측정값<br/>있음?"}
+    T -- 있음 --> U["평균 SQM 계산<br/>'Avg SQM: xx.xx (n/21)' 표시"]
+    T -- 없음 --> V["'Avg SQM: N/A' 표시"]
+    U --> W["홈 포지션 복귀<br/>(Pan:90, Tilt:45)"]
+    V --> W
+    W --> X["무한 대기 - 재스캔 안 함"]
+</div>
+
+<script>
+  mermaid.initialize({ startOnLoad: true });
+</script>
+</body>
+</html>

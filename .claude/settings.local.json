@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(cp \"C:\\\\Users\\\\flyer\\\\my-first-vibe\\\\firmware\\\\pan_tilt_sqm\\\\config.h\" \"C:\\\\Users\\\\flyer\\\\OneDrive\\\\문서\\\\Arduino\\\\pan_tilt_sqm\\\\config.h\")",
+      "Bash(cp \"C:\\\\Users\\\\flyer\\\\my-first-vibe\\\\firmware\\\\pan_tilt_sqm\\\\pan_tilt_sqm.ino\" \"C:\\\\Users\\\\flyer\\\\OneDrive\\\\문서\\\\Arduino\\\\pan_tilt_sqm\\\\pan_tilt_sqm.ino\")"
+    ]
+  }
+}

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>랜덤 발표 순서</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+      background: #f0f4ff;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    header {
+      text-align: center;
+      padding: 1rem 0 0.5rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #4f6ef7;
+    }
+
+    header p {
+      margin-top: 0.4rem;
+      font-size: 0.9rem;
+      color: #6b7280;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 1.25rem;
+      box-shadow: 0 2px 12px rgba(79, 110, 247, 0.08);
+    }
+
+    .card-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.85rem;
+    }
+
+    textarea {
+      width: 100%;
+      height: 90px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0.7rem 0.85rem;
+      font-family: inherit;
+      font-size: 0.95rem;
+      resize: vertical;
+      transition: border-color 0.2s;
+      color: #1a1a2e;
+    }
+
+    textarea:focus { outline: none; border-color: #4f6ef7; }
+    textarea::placeholder { color: #9ca3af; }
+
+    .import-row {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 0.5rem;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 0.85rem 0;
+      color: #9ca3af;
+      font-size: 0.8rem;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+
+    .single-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 0.6rem 0.85rem;
+      font-family: inherit;
+      font-size: 0.95rem;
+      transition: border-color 0.2s;
+      color: #1a1a2e;
+    }
+
+    input[type="text"]:focus { outline: none; border-color: #4f6ef7; }
+    input[type="text"]::placeholder { color: #9ca3af; }
+
+    button {
+      font-family: inherit;
+      font-weight: 500;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.1s, opacity 0.2s, background 0.2s;
+    }
+
+    button:active { transform: scale(0.97); }
+
+    .btn-secondary {
+      background: #e8edff;
+      color: #4f6ef7;
+      padding: 0.6rem 1rem;
+      font-size: 0.9rem;
+    }
+
+    .btn-secondary:hover { background: #d6dfff; }
+
+    .name-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .name-count {
+      font-size: 0.85rem;
+      color: #6b7280;
+    }
+
+    .name-count span {
+      font-weight: 700;
+      color: #4f6ef7;
+    }
+
+    .clear-all-btn {
+      background: none;
+      border: none;
+      color: #9ca3af;
+      font-size: 0.8rem;
+      cursor: pointer;
+      padding: 0.2rem 0.4rem;
+      border-radius: 6px;
+    }
+
+    .clear-all-btn:hover { color: #ef4444; background: #fff1f1; }
+
+    .name-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      min-height: 2rem;
+    }
+
+    .name-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: #e8edff;
+      color: #4f6ef7;
+      border-radius: 999px;
+      padding: 0.3rem 0.75rem 0.3rem 0.85rem;
+      font-size: 0.9rem;
+      animation: tagIn 0.2s ease;
+    }
+
+    @keyframes tagIn {
+      from { opacity: 0; transform: scale(0.85); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .name-tag .remove-btn {
+      background: none;
+      border: none;
+      color: #4f6ef7;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 0.1rem;
+      border-radius: 999px;
+      opacity: 0.55;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .name-tag .remove-btn:hover { opacity: 1; }
+    .name-tag .remove-btn:active { transform: none; }
+
+    .action-bar {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    .btn-primary {
+      flex: 1;
+      background: #4f6ef7;
+      color: #fff;
+      padding: 0.85rem 1rem;
+      font-size: 1rem;
+      font-weight: 700;
+      border-radius: 12px;
+      box-shadow: 0 4px 14px rgba(79, 110, 247, 0.35);
+    }
+
+    .btn-primary:hover:not(:disabled) { background: #3d5ce5; box-shadow: 0 6px 18px rgba(79, 110, 247, 0.45); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+    .btn-danger {
+      background: #fff1f1;
+      color: #ef4444;
+      padding: 0.85rem 1.1rem;
+      font-size: 0.9rem;
+      border-radius: 12px;
+      white-space: nowrap;
+    }
+
+    .btn-danger:hover { background: #ffe4e4; }
+    .btn-danger.confirming { background: #ef4444; color: #fff; }
+    .btn-danger.confirming:hover { background: #dc2626; }
+
+    .result-panel {
+      display: none;
+    }
+
+    .result-panel.visible {
+      display: block;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .result-header h2 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+
+    .result-header .result-count {
+      font-size: 0.82rem;
+      color: #9ca3af;
+    }
+
+    #result-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    #result-list.fading { opacity: 0; transition: opacity 0.18s; }
+
+    #result-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.75rem 1rem;
+      background: #f8faff;
+      border-radius: 10px;
+      border-left: 3px solid #4f6ef7;
+      opacity: 0;
+      animation: revealItem 0.35s ease forwards;
+      animation-delay: calc(min(var(--i, 0), 15) * 80ms);
+    }
+
+    @keyframes revealItem {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-rank {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #fff;
+      background: #4f6ef7;
+      width: 1.6rem;
+      height: 1.6rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .result-name {
+      font-size: 1.05rem;
+      font-weight: 500;
+    }
+
+    @media (max-width: 480px) {
+      header h1 { font-size: 1.45rem; }
+      .single-row { flex-direction: column; }
+      .single-row input[type="text"] { width: 100%; }
+      .action-bar { flex-direction: column; }
+      .btn-danger { text-align: center; }
+      #result-list li { font-size: 0.95rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎲 랜덤 발표 순서</h1>
+      <p>학생 이름을 입력하고 발표 순서를 뽑아보세요</p>
+    </header>
+
+    <div class="card">
+      <div class="card-title">이름 입력</div>
+
+      <textarea id="bulk-input" placeholder="이름을 여러 개 붙여넣기&#10;(줄바꿈 또는 쉼표로 구분)&#10;예: 김민준, 이서연, 박지호"></textarea>
+      <div class="import-row">
+        <button class="btn-secondary" id="import-btn">가져오기</button>
+      </div>
+
+      <div class="divider">또는 한 명씩 입력</div>
+
+      <div class="single-row">
+        <input type="text" id="name-input" placeholder="학생 이름 입력 후 Enter" maxlength="20">
+        <button class="btn-secondary" id="add-btn">추가</button>
+      </div>
+
+      <div class="name-meta">
+        <div class="name-count">학생 수: <span id="count-num">0</span>명</div>
+        <button class="clear-all-btn" id="clear-all-btn">전체 삭제</button>
+      </div>
+      <div class="name-tags" id="name-tags"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn-primary" id="shuffle-btn" disabled>랜덤 발표 순서 정하기</button>
+      <button class="btn-danger" id="reset-btn">초기화</button>
+    </div>
+
+    <div class="card result-panel" id="result-panel">
+      <div class="result-header">
+        <h2>발표 순서</h2>
+        <span class="result-count" id="result-count"></span>
+      </div>
+      <ol id="result-list"></ol>
+    </div>
+  </div>
+
+  <script>
+    let students = [];
+    let resetConfirming = false;
+    let resetTimer = null;
+    let hasShuffled = false;
+
+    const bulkInput = document.getElementById('bulk-input');
+    const importBtn = document.getElementById('import-btn');
+    const nameInput = document.getElementById('name-input');
+    const addBtn = document.getElementById('add-btn');
+    const nameTags = document.getElementById('name-tags');
+    const countNum = document.getElementById('count-num');
+    const clearAllBtn = document.getElementById('clear-all-btn');
+    const shuffleBtn = document.getElementById('shuffle-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const resultPanel = document.getElementById('result-panel');
+    const resultList = document.getElementById('result-list');
+    const resultCount = document.getElementById('result-count');
+
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function addName(name) {
+      const trimmed = name.trim();
+      if (!trimmed || students.includes(trimmed)) return false;
+      students.push(trimmed);
+      return true;
+    }
+
+    function renderNameTags() {
+      nameTags.innerHTML = '';
+      students.forEach((name, i) => {
+        const tag = document.createElement('span');
+        tag.className = 'name-tag';
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = name;
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-btn';
+        removeBtn.textContent = '×';
+        removeBtn.setAttribute('aria-label', `${name} 제거`);
+        removeBtn.addEventListener('click', () => {
+          students.splice(i, 1);
+          renderNameTags();
+          updateUI();
+          clearResult();
+        });
+        tag.appendChild(nameSpan);
+        tag.appendChild(removeBtn);
+        nameTags.appendChild(tag);
+      });
+      countNum.textContent = students.length;
+    }
+
+    function updateUI() {
+      shuffleBtn.disabled = students.length < 2;
+      if (hasShuffled && students.length >= 2) {
+        shuffleBtn.textContent = '다시 섞기';
+      } else {
+        shuffleBtn.textContent = '랜덤 발표 순서 정하기';
+        hasShuffled = false;
+      }
+    }
+
+    function clearResult() {
+      resultPanel.classList.remove('visible');
+      resultList.innerHTML = '';
+      hasShuffled = false;
+    }
+
+    function doShuffle() {
+      if (students.length < 2) return;
+      hasShuffled = true;
+      shuffleBtn.textContent = '다시 섞기';
+
+      resultList.classList.add('fading');
+
+      setTimeout(() => {
+        const shuffled = shuffle(students);
+        resultList.innerHTML = '';
+        shuffled.forEach((name, i) => {
+          const li = document.createElement('li');
+          li.style.setProperty('--i', i);
+
+          const rank = document.createElement('span');
+          rank.className = 'result-rank';
+          rank.textContent = i + 1;
+
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'result-name';
+          nameSpan.textContent = name;
+
+          li.appendChild(rank);
+          li.appendChild(nameSpan);
+          resultList.appendChild(li);
+        });
+
+        resultCount.textContent = `총 ${shuffled.length}명`;
+        resultList.classList.remove('fading');
+        resultPanel.classList.add('visible');
+
+        setTimeout(() => {
+          resultPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+      }, resultPanel.classList.contains('visible') ? 200 : 0);
+    }
+
+    importBtn.addEventListener('click', () => {
+      const lines = bulkInput.value.split(/[\n\r\t,，、]+/);
+      let added = 0;
+      lines.forEach(name => { if (addName(name)) added++; });
+      bulkInput.value = '';
+      if (added > 0) {
+        renderNameTags();
+        updateUI();
+        clearResult();
+      }
+    });
+
+    addBtn.addEventListener('click', () => {
+      if (addName(nameInput.value)) {
+        nameInput.value = '';
+        renderNameTags();
+        updateUI();
+        clearResult();
+      }
+      nameInput.focus();
+    });
+
+    nameInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') addBtn.click();
+    });
+
+    clearAllBtn.addEventListener('click', () => {
+      students = [];
+      renderNameTags();
+      updateUI();
+      clearResult();
+    });
+
+    shuffleBtn.addEventListener('click', doShuffle);
+
+    resetBtn.addEventListener('click', () => {
+      if (!resetConfirming) {
+        resetConfirming = true;
+        resetBtn.textContent = '정말 초기화?';
+        resetBtn.classList.add('confirming');
+        resetTimer = setTimeout(() => {
+          resetConfirming = false;
+          resetBtn.textContent = '초기화';
+          resetBtn.classList.remove('confirming');
+        }, 2500);
+      } else {
+        clearTimeout(resetTimer);
+        resetConfirming = false;
+        resetBtn.textContent = '초기화';
+        resetBtn.classList.remove('confirming');
+        students = [];
+        renderNameTags();
+        updateUI();
+        clearResult();
+        bulkInput.value = '';
+        nameInput.value = '';
+      }
+    });
+
+    updateUI();
+  </script>
+</body>
+</html>

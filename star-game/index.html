@@ -233,9 +233,9 @@ function updateUI(user) {
     protText.style.color = 'var(--text-sub)';
   }
 
-  // 별 보관 버튼 (1강 이상에서 보관 가능)
+  // 별 보관 버튼 (19강 이상에서만 보관 가능)
   const btnStore = document.getElementById('btn-store');
-  btnStore.style.display = level >= 1 ? '' : 'none';
+  btnStore.style.display = level >= 19 ? '' : 'none';
 
   // 액션 행: 0강=아이템창+상점 / 1강+=조합소+판매
   const btnLeft  = document.getElementById('btn-left');

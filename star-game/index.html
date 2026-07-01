@@ -324,7 +324,7 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
   const level = currentUser.currentStar;
   const stage = STAGES[level];
 
-  const result = await enhance(currentUser);
+  const result = enhance(currentUser);
 
   if (result.blocked || result.error) {
     showOverlay('⚠️ 주의', '', result.error || '오류가 발생했습니다.');

@@ -2,74 +2,48 @@
 // game.js — 강화 핵심 로직
 // ============================================================
 
-// ─── 레이트리밋 ─────────────────────────────────────────────
+// ─── 클라이언트 레이트리밋 (Firebase 호출 없음) ──────────────
 
-async function checkRateLimit(userKey) {
+const _rl = { startMs: Date.now(), count: 0 };
+
+function checkRateLimitLocal() {
   const now = Date.now();
-  const windowData = await dbGet(`users/${userKey}/rateWindow`);
-  const w = windowData || { startMs: now, count: 0 };
-
-  // 1분 경과 시 창 초기화
-  if (now - w.startMs > 60000) {
-    await dbSet(`users/${userKey}/rateWindow`, { startMs: now, count: 1 });
+  if (now - _rl.startMs > 60000) {
+    _rl.startMs = now;
+    _rl.count = 1;
     return true;
   }
-
-  if (w.count >= RATE_LIMIT.maxPerMinute) return false;
-
-  await dbSet(`users/${userKey}/rateWindow`, { startMs: w.startMs, count: w.count + 1 });
+  if (_rl.count >= RATE_LIMIT.maxPerMinute) return false;
+  _rl.count++;
   return true;
 }
 
-// ─── 강화 비용 차감 ─────────────────────────────────────────
+// ─── 비용 사전 검증 (로컬) ──────────────────────────────────
 
-/**
- * 강화 비용을 확인하고 차감합니다.
- * @returns {Promise<{ok: boolean, error?: string}>}
- */
-async function deductCost(user, stage) {
-  const cost = stage.cost;
+function checkCost(user, cost) {
   if (!cost) return { ok: false, error: '강화할 수 없는 단계입니다.' };
-
   if (cost.type === 'hydrogen') {
-    if (user.hydrogen < cost.amount) return { ok: false, error: '수소가 부족합니다.' };
-    await dbUpdate(`users/${user.userKey}`, { hydrogen: user.hydrogen - cost.amount });
-    return { ok: true };
-  }
-
-  if (cost.type === 'item') {
+    if ((user.hydrogen || 0) < cost.amount) return { ok: false, error: '수소가 부족합니다.' };
+  } else if (cost.type === 'item') {
     const held = (user.items && user.items[cost.key]) || 0;
-    if (held < cost.amount) {
-      return { ok: false, error: `${ITEM_NAMES[cost.key]}이(가) ${cost.amount}개 필요합니다.` };
-    }
-    await dbUpdate(`users/${user.userKey}/items`, { [cost.key]: held - cost.amount });
-    return { ok: true };
-  }
-
-  if (cost.type === 'star') {
+    if (held < cost.amount) return { ok: false, error: `${ITEM_NAMES[cost.key]}이(가) ${cost.amount}개 필요합니다.` };
+  } else if (cost.type === 'star') {
     const stored = (user.storedStars && user.storedStars[cost.level]) || 0;
-    if (stored < cost.amount) {
-      return { ok: false, error: `${STAGES[cost.level].name}(+${cost.level}강) 별이 ${cost.amount}개 필요합니다.` };
-    }
-    await dbUpdate(`users/${user.userKey}/storedStars`, {
-      [cost.level]: stored - cost.amount,
-    });
-    return { ok: true };
+    if (stored < cost.amount) return { ok: false, error: `${STAGES[cost.level].name}(+${cost.level}강) 별이 ${cost.amount}개 필요합니다.` };
   }
-
-  return { ok: false, error: '알 수 없는 비용 형식입니다.' };
+  return { ok: true };
 }
 
 // ─── 강화 시도 ─────────────────────────────────────────────
 
 /**
  * 강화를 시도합니다.
- * @returns {Promise<{success: boolean, drop?: {key, amount}, blocked?: boolean, error?: string}>}
+ * Firebase 쓰기를 1회로 합치고 await 하지 않아 즉각 반응합니다.
+ * @returns {{success: boolean, drop?: {key, amount}, blocked?: boolean, error?: string}}
  */
-async function enhance(user) {
-  // 레이트리밋 확인
-  const allowed = await checkRateLimit(user.userKey);
-  if (!allowed) {
+function enhance(user) {
+  // 레이트리밋 (로컬, 0ms)
+  if (!checkRateLimitLocal()) {
     return { success: false, blocked: true, error: '잠깐! 너무 빠릅니다. 잠시 후 다시 시도하세요.' };
   }
 
@@ -78,24 +52,49 @@ async function enhance(user) {
     return { success: false, error: '강화할 수 없는 단계입니다.' };
   }
 
-  // 비용 차감
-  const deductResult = await deductCost(user, stage);
-  if (!deductResult.ok) return { success: false, error: deductResult.error };
+  // 비용 검증 (로컬, 0ms)
+  const check = checkCost(user, stage.cost);
+  if (!check.ok) return { success: false, error: check.error };
 
-  // 성공/실패 판정
-  const roll = Math.random();
-  const success = roll < stage.successRate;
+  // 성공/실패 판정 (로컬, 0ms)
+  const success = Math.random() < stage.successRate;
 
-  // 드랍 계산 (실패 시 + 드랍 정의 있을 때)
+  // 드랍 계산 (로컬, 0ms)
   let drop = null;
   if (!success && stage.drop) {
     const amount = stage.drop.min + Math.floor(Math.random() * (stage.drop.max - stage.drop.min + 1));
     drop = { key: stage.drop.key, amount };
   }
 
-  // 로그 기록
-  const nextLevel = success ? user.currentStar + 1 : Math.max(0, user.currentStar - (stage.protectionCost > 0 ? 1 : 0));
-  await dbPush(`enhanceLogs/${user.userKey}`, {
+  // ── Firebase 쓰기: 모든 변경을 1번의 multi-path update로 ──
+  const uid  = user.userKey;
+  const cost = stage.cost;
+  const upd  = {};
+
+  // 비용 차감
+  if (cost.type === 'hydrogen') {
+    upd[`users/${uid}/hydrogen`] = (user.hydrogen || 0) - cost.amount;
+  } else if (cost.type === 'item') {
+    const held = (user.items && user.items[cost.key]) || 0;
+    upd[`users/${uid}/items/${cost.key}`] = held - cost.amount;
+  } else if (cost.type === 'star') {
+    const stored = (user.storedStars && user.storedStars[cost.level]) || 0;
+    upd[`users/${uid}/storedStars/${cost.level}`] = stored - cost.amount;
+  }
+
+  if (success) {
+    const newLevel = user.currentStar + 1;
+    upd[`users/${uid}/currentStar`] = newLevel;
+    if (newLevel > (user.bestStar || 0)) upd[`users/${uid}/bestStar`] = newLevel;
+    const unlocked = user.unlockedCodex || [];
+    if (!unlocked.includes(newLevel)) upd[`users/${uid}/unlockedCodex`] = [...unlocked, newLevel];
+  }
+
+  // fire-and-forget (await 하지 않음 → UI 즉각 반응)
+  firebase.database().ref().update(upd);
+
+  // 로그도 fire-and-forget
+  firebase.database().ref(`enhanceLogs/${uid}`).push({
     from: user.currentStar,
     to: success ? user.currentStar + 1 : user.currentStar,
     result: success ? 'success' : 'fail',
@@ -103,32 +102,12 @@ async function enhance(user) {
     timeMs: Date.now(),
   });
 
-  if (success) {
-    const newLevel = user.currentStar + 1;
-    const updates = { currentStar: newLevel };
-
-    // 최고 기록 갱신
-    if (newLevel > (user.bestStar || 0)) updates.bestStar = newLevel;
-
-    // 도감 해금 (처음 도달 시만)
-    const unlocked = user.unlockedCodex || [];
-    if (!unlocked.includes(newLevel)) {
-      updates.unlockedCodex = [...unlocked, newLevel];
-    }
-
-    await dbUpdate(`users/${user.userKey}`, updates);
-  }
-
   return { success, drop };
 }
 
 // ─── 방지권 사용 (실패 후 선택) ─────────────────────────────
 
-/**
- * 강화 실패 후 방지권을 소모하여 단계를 유지합니다.
- * @returns {Promise<{ok: boolean, error?: string}>}
- */
-async function useProtectionScroll(user) {
+function useProtectionScroll(user) {
   const stage = STAGES[user.currentStar];
   if (!stage || stage.protectionCost <= 0) {
     return { ok: false, error: '이 단계는 방지권을 사용할 수 없습니다.' };
@@ -136,72 +115,49 @@ async function useProtectionScroll(user) {
   if ((user.protectionScrolls || 0) < stage.protectionCost) {
     return { ok: false, error: `붕괴 방지권이 ${stage.protectionCost}개 필요합니다.` };
   }
-
-  await dbUpdate(`users/${user.userKey}`, {
-    protectionScrolls: user.protectionScrolls - stage.protectionCost,
-  });
-
-  // 방지권 사용 로그 덮어쓰기 (마지막 로그)
+  firebase.database().ref(`users/${user.userKey}/protectionScrolls`)
+    .set(user.protectionScrolls - stage.protectionCost);
   return { ok: true };
 }
 
-/**
- * 방지권 미사용 — 단계 하락 처리
- */
-async function applyFallback(user) {
+// 방지권 미사용 — +0 초기화
+function applyFallback(user) {
   const stage = STAGES[user.currentStar];
-  if (!stage || stage.protectionCost === 0) return; // 하락 없는 구간
-
-  // 실패 시 +0으로 초기화 (방지권 미사용)
-  await dbUpdate(`users/${user.userKey}`, { currentStar: 0 });
+  if (!stage || stage.protectionCost === 0) return;
+  firebase.database().ref(`users/${user.userKey}/currentStar`).set(0);
 }
 
 // ─── 드랍 아이템 줍기 ────────────────────────────────────────
 
-/**
- * 드랍된 아이템을 인벤토리에 추가합니다.
- */
-async function pickupItem(user, itemKey, amount) {
+function pickupItem(user, itemKey, amount) {
   const current = (user.items && user.items[itemKey]) || 0;
-  await dbUpdate(`users/${user.userKey}/items`, { [itemKey]: current + amount });
+  firebase.database().ref(`users/${user.userKey}/items/${itemKey}`).set(current + amount);
 }
 
 // ─── 별 판매 ─────────────────────────────────────────────────
 
-/**
- * 현재 별을 수소로 판매하고 +0으로 초기화합니다.
- * @returns {Promise<{ok: boolean, gained?: number, error?: string}>}
- */
 async function sellStar(user) {
   const stage = STAGES[user.currentStar];
-  if (!stage || !stage.sellPrice) {
-    return { ok: false, error: '이 별은 판매할 수 없습니다.' };
-  }
+  if (!stage || !stage.sellPrice) return { ok: false, error: '이 별은 판매할 수 없습니다.' };
 
-  await dbUpdate(`users/${user.userKey}`, {
-    hydrogen: (user.hydrogen || 0) + stage.sellPrice,
-    currentStar: 0,
+  await firebase.database().ref().update({
+    [`users/${user.userKey}/hydrogen`]:    (user.hydrogen || 0) + stage.sellPrice,
+    [`users/${user.userKey}/currentStar`]: 0,
   });
-
   return { ok: true, gained: stage.sellPrice };
 }
 
 // ─── 별 보관 ─────────────────────────────────────────────────
 
-/**
- * 현재 별을 보관하고 +0으로 초기화합니다.
- * 보관된 별은 +21~+24 등 특수 강화 비용으로 사용됩니다.
- */
 async function storeStar(user) {
   const level = user.currentStar;
-  if (level < 1) return { ok: false, error: '보관할 수 있는 별이 없습니다.' };
+  if (level < 19) return { ok: false, error: '19강 이상에서만 보관할 수 있습니다.' };
 
   const stored = (user.storedStars && user.storedStars[level]) || 0;
-  await dbUpdate(`users/${user.userKey}`, {
-    [`storedStars/${level}`]: stored + 1,
-    currentStar: 0,
+  await firebase.database().ref().update({
+    [`users/${user.userKey}/storedStars/${level}`]: stored + 1,
+    [`users/${user.userKey}/currentStar`]:          0,
   });
-
   return { ok: true };
 }
 

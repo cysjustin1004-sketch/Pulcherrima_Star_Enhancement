@@ -155,19 +155,23 @@ async function loadUsers() {
   users.forEach(user => {
     const row = document.createElement('div');
     row.className = 'admin-user-row';
+    const isBanned = !!user.banned;
     row.innerHTML = `
       <div class="admin-user-info">
-        <div class="admin-user-nick">${escapeHtml(user.nickname || user.key)}</div>
+        <div class="admin-user-nick">${escapeHtml(user.nickname || user.key)}${isBanned ? ' <span style="color:var(--danger);font-size:0.75rem;">[벤]</span>' : ''}</div>
         <div class="admin-user-stat">
           💧 ${formatNumber(user.hydrogen || 0)} · ⭐ +${user.currentStar || 0} · 최고 +${user.bestStar || 0} · 방지권 ${user.protectionScrolls || 0}
         </div>
       </div>
-      <button class="btn-outline" style="font-size:0.78rem; padding:0.4rem 0.7rem;" data-key="${user.key}" data-nick="${escapeHtml(user.nickname || user.key)}">로그 보기</button>
+      <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+        <button class="btn-outline" style="font-size:0.78rem; padding:0.4rem 0.7rem;">로그</button>
+        <button class="${isBanned ? 'btn-secondary' : 'btn-danger'}" style="font-size:0.78rem; padding:0.4rem 0.7rem;">${isBanned ? '벤 해제' : '벤'}</button>
+      </div>
     `;
 
-    row.querySelector('button').addEventListener('click', () => {
-      viewLogs(user.key, user.nickname || user.key);
-    });
+    const [btnLog, btnBan] = row.querySelectorAll('button');
+    btnLog.addEventListener('click', () => viewLogs(user.key, user.nickname || user.key));
+    btnBan.addEventListener('click', () => toggleBan(user.key, user.nickname || user.key, isBanned));
 
     userList.appendChild(row);
   });
@@ -244,6 +248,14 @@ document.getElementById('btn-give-hydrogen').addEventListener('click', async () 
   document.getElementById('give-amount').value   = '';
   await loadUsers();
 });
+
+async function toggleBan(userKey, nickname, currentlyBanned) {
+  const action = currentlyBanned ? '벤을 해제' : '벤';
+  if (!confirm(`${nickname} 님을 ${action}하시겠습니까?`)) return;
+  await dbUpdate(`users/${userKey}`, { banned: !currentlyBanned });
+  showToast(`${nickname} ${currentlyBanned ? '벤 해제' : '벤'} 완료`);
+  await loadUsers();
+}
 
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

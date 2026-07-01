@@ -135,10 +135,16 @@ async function login(nickname, password) {
 
 // ─── 유저 데이터 로드 ────────────────────────────────────────
 
-/** 현재 세션 유저의 DB 데이터 로드 */
+/** 현재 세션 유저의 DB 데이터 로드 (벤 체크 포함) */
 async function loadCurrentUser() {
   const session = getSession();
   if (!session) return null;
   const data = await dbGet(`users/${session.userKey}`);
-  return data ? { ...data, userKey: session.userKey } : null;
+  if (!data) return null;
+  if (data.banned) {
+    clearSession();
+    location.href = 'banned.html';
+    return null;
+  }
+  return { ...data, userKey: session.userKey };
 }

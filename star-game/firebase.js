@@ -6,13 +6,13 @@
 // ============================================================
 
 const firebaseConfig = {
-  apiKey:            "여기에_apiKey_입력",
-  authDomain:        "여기에_authDomain_입력",
-  databaseURL:       "여기에_databaseURL_입력",
-  projectId:         "여기에_projectId_입력",
-  storageBucket:     "여기에_storageBucket_입력",
-  messagingSenderId: "여기에_messagingSenderId_입력",
-  appId:             "여기에_appId_입력",
+  apiKey:            "AIzaSyC2DkPz7IU9mOWYLEQ81eJ8wXxE2fwZ454",
+  authDomain:        "star-game-5c3e5.firebaseapp.com",
+  databaseURL:       "https://star-game-5c3e5-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "star-game-5c3e5",
+  storageBucket:     "star-game-5c3e5.firebasestorage.app",
+  messagingSenderId: "581364303073",
+  appId:             "1:581364303073:web:75fc9e29f4c9c52bc663a0",
 };
 
 // Firebase SDK (CDN) 로드 확인 후 초기화

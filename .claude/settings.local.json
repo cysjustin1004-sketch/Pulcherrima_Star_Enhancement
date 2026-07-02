@@ -4,7 +4,11 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(cp \"C:\\\\Users\\\\flyer\\\\my-first-vibe\\\\firmware\\\\pan_tilt_sqm\\\\config.h\" \"C:\\\\Users\\\\flyer\\\\OneDrive\\\\문서\\\\Arduino\\\\pan_tilt_sqm\\\\config.h\")",
-      "Bash(cp \"C:\\\\Users\\\\flyer\\\\my-first-vibe\\\\firmware\\\\pan_tilt_sqm\\\\pan_tilt_sqm.ino\" \"C:\\\\Users\\\\flyer\\\\OneDrive\\\\문서\\\\Arduino\\\\pan_tilt_sqm\\\\pan_tilt_sqm.ino\")"
+      "Bash(cp \"C:\\\\Users\\\\flyer\\\\my-first-vibe\\\\firmware\\\\pan_tilt_sqm\\\\pan_tilt_sqm.ino\" \"C:\\\\Users\\\\flyer\\\\OneDrive\\\\문서\\\\Arduino\\\\pan_tilt_sqm\\\\pan_tilt_sqm.ino\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\flyer\\\\hardware-projects\\\\docs\\\\manual\" \"C:\\\\Users\\\\flyer\\\\hardware-projects\\\\docs\\\\superpowers\\\\plans\" \"C:\\\\Users\\\\flyer\\\\hardware-projects\\\\docs\\\\superpowers\\\\specs\")",
+      "Bash(mv docs/manual/pan-tilt-sqm-flowchart.html 'C:\\\\Users\\\\flyer\\\\hardware-projects\\\\docs\\\\manual\" && mv docs/manual/pan-tilt-sqm-manual.md C:Usersflyerhardware-projectsdocsmanual\"')",
+      "Bash(mv docs/superpowers/plans/2026-05-27-allsky-ap-mode.md 'C:\\\\Users\\\\flyer\\\\hardware-projects\\\\docs\\\\superpowers\\\\plans\" && mv docs/superpowers/plans/2026-06-09-pan-tilt-sqm.md C:Usersflyerhardware-projectsdocssuperpowersplans\"')",
+      "Bash(mv docs/superpowers/specs/2026-05-27-allsky-ap-mode-design.md 'C:\\\\Users\\\\flyer\\\\hardware-projects\\\\docs\\\\superpowers\\\\specs\" && mv docs/superpowers/specs/2026-06-09-pan-tilt-sqm-design.md C:Usersflyerhardware-projectsdocssuperpowersspecs\"')"
     ]
   }
 }

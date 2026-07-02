@@ -14,7 +14,7 @@
 <div class="codex-modal-bg" id="codex-modal-bg" onclick="handleModalBgClick(event)">
   <div class="codex-modal">
     <div class="codex-modal-level" id="modal-level">+0강</div>
-    <div style="margin: 0.75rem auto 0.75rem; width:56px; height:56px;" id="modal-star-visual"></div>
+    <div style="margin: 0.75rem auto 0.75rem; text-align:center;" id="modal-star-visual"></div>
     <div class="codex-modal-name" id="modal-name"></div>
     <div class="codex-modal-sub"  id="modal-sub"></div>
     <div class="codex-modal-desc" id="modal-desc"></div>
@@ -74,7 +74,7 @@ function openEntry(level) {
   document.getElementById('modal-desc').textContent  = stage.codexDescription;
 
   const visualEl = document.getElementById('modal-star-visual');
-  visualEl.innerHTML = `<div class="star-core ${getStarCssClass(level)}" style="width:56px;height:56px;"></div>`;
+  visualEl.innerHTML = `<img src="images/star_${level}.png" alt="" style="width:140px;height:140px;object-fit:contain;filter:brightness(1.05) saturate(1.2);">`;
 
   document.getElementById('codex-modal-bg').classList.add('visible');
 }
@@ -98,10 +98,10 @@ async function renderCodex() {
 
     item.innerHTML = `
       <div class="codex-level-badge">+${level}</div>
-      <div style="flex-shrink:0;">
+      <div>
         ${isUnlocked
-          ? `<div class="star-core ${getStarCssClass(level)}" style="width:36px;height:36px;"></div>`
-          : '<div style="font-size:1.5rem; color:var(--text-sub);">?</div>'}
+          ? `<img src="images/star_${level}.png" class="codex-star-thumb" alt="">`
+          : '<div class="codex-star-lock">?</div>'}
       </div>
       <div class="codex-info">
         <div class="codex-name">${isUnlocked ? stage.name : '???'}</div>

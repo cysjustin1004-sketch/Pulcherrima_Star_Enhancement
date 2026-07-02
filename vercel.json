@@ -1,5 +1,9 @@
 {
-  "routes": [
-    { "src": "/", "dest": "/profile.html" }
-  ]
+  "redirects": [
+    { "source": "/", "destination": "/star-game/login.html" },
+    { "source": "/game", "destination": "/star-game/login.html" }
+  ],
+  "functions": {
+    "api/**/*.js": { "regions": ["sin1"] }
+  }
 }

@@ -158,40 +158,29 @@ function renderAll(user) {
 async function handleCraft(recipe) {
   if (!currentUser) return;
 
-  // 재료 재확인
-  for (const inp of recipe.inputs) {
-    const held = (currentUser.items && currentUser.items[inp.key]) || 0;
-    if (held < inp.amount) {
-      showToast(`${ITEM_NAMES[inp.key]}이(가) 부족합니다.`);
-      return;
+  const token = getToken();
+  const res = await fetch('/api/combine/craft', {
+    method:  'POST',
+    headers: {
+      'Content-Type':    'application/json',
+      'X-Session-Token': token || '',
+    },
+    body: JSON.stringify({ recipeId: recipe.id }),
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    const out = data.output;
+    if (out.type === 'protection') {
+      showToast(`붕괴 방지권 ${out.amount}개 획득!`);
+    } else if (out.type === 'star') {
+      const stageName = STAGES[out.level] ? STAGES[out.level].name : `+${out.level}강`;
+      showToast(`${stageName}(+${out.level}강) 별 1개 획득!`);
     }
+    await reload();
+  } else {
+    showToast(data.error || '조합 실패');
   }
-
-  // 재료 차감
-  const itemUpdates = {};
-  for (const inp of recipe.inputs) {
-    const held = (currentUser.items && currentUser.items[inp.key]) || 0;
-    itemUpdates[inp.key] = held - inp.amount;
-  }
-  await dbUpdate(`users/${currentUser.userKey}/items`, itemUpdates);
-
-  // 결과 지급
-  const output = recipe.output;
-  if (output.type === 'protection') {
-    await dbUpdate(`users/${currentUser.userKey}`, {
-      protectionScrolls: (currentUser.protectionScrolls || 0) + output.amount,
-    });
-    showToast(`붕괴 방지권 ${output.amount}개 획득!`);
-  } else if (output.type === 'star') {
-    const storedCount = (currentUser.storedStars && currentUser.storedStars[output.level]) || 0;
-    await dbUpdate(`users/${currentUser.userKey}/storedStars`, {
-      [output.level]: storedCount + 1,
-    });
-    const stageName = STAGES[output.level] ? STAGES[output.level].name : `+${output.level}강`;
-    showToast(`${stageName}(+${output.level}강) 별 1개 획득!`);
-  }
-
-  await reload();
 }
 
 async function reload() {

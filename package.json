@@ -1,0 +1,8 @@
+{
+  "name": "my-first-vibe",
+  "version": "1.0.0",
+  "engines": { "node": "24.x" },
+  "dependencies": {
+    "firebase-admin": "^12.3.0"
+  }
+}

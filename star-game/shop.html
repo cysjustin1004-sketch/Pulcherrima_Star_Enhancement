@@ -107,29 +107,23 @@ async function handleBuy(item) {
     return;
   }
 
-  const newHydrogen = (currentUser.hydrogen || 0) - item.price;
-  const updates = { hydrogen: newHydrogen };
+  const token = getToken();
+  const res = await fetch('/api/shop/buy', {
+    method:  'POST',
+    headers: {
+      'Content-Type':    'application/json',
+      'X-Session-Token': token || '',
+    },
+    body: JSON.stringify({ itemId: item.id }),
+  });
+  const data = await res.json();
 
-  if (item.type === 'warp') {
-    updates.currentStar = item.targetLevel;
-    // 도감 해금 (중간 단계들도 해금)
-    const unlocked = currentUser.unlockedCodex || [];
-    const newUnlocked = [...unlocked];
-    for (let i = 1; i <= item.targetLevel; i++) {
-      if (!newUnlocked.includes(i)) newUnlocked.push(i);
-    }
-    updates.unlockedCodex = newUnlocked;
-    // bestStar 갱신
-    if (item.targetLevel > (currentUser.bestStar || 0)) {
-      updates.bestStar = item.targetLevel;
-    }
-  } else if (item.type === 'protection') {
-    updates.protectionScrolls = (currentUser.protectionScrolls || 0) + item.amount;
+  if (data.ok) {
+    showToast(`${item.name} 구매 완료!`);
+    await reload();
+  } else {
+    showToast(data.error || '구매 실패');
   }
-
-  await dbUpdate(`users/${currentUser.userKey}`, updates);
-  showToast(`${item.name} 구매 완료!`);
-  await reload();
 }
 
 async function reload() {

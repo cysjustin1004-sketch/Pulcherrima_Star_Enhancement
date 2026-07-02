@@ -70,12 +70,8 @@
 <script src="auth.js"></script>
 <script src="game.js"></script>
 <script>
-// 관리자 비밀번호는 Firebase /config/admin/passwordHash 에 저장
-// 최초 설정 방법: 아래 ADMIN_SETUP_MODE를 true로 변경, 비밀번호를 한 번 입력하면 해시 저장됨.
-// 저장 후 반드시 false로 되돌려야 합니다.
-const ADMIN_SETUP_MODE = false;
-
-let adminAuthenticated = false;
+// 관리자 세션 토큰 (메모리에만 보관, 페이지 새로고침 시 재인증 필요)
+let adminToken = null;
 
 function showToast(msg) {
   const t = document.createElement('div');
@@ -86,8 +82,14 @@ function showToast(msg) {
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 2200);
 }
 
+// SHA-256 해시 (WebCrypto API)
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 document.getElementById('btn-admin-login').addEventListener('click', async () => {
-  const pw = document.getElementById('admin-pw-input').value;
+  const pw    = document.getElementById('admin-pw-input').value;
   const errEl = document.getElementById('admin-pw-error');
   errEl.classList.remove('visible');
 
@@ -97,29 +99,23 @@ document.getElementById('btn-admin-login').addEventListener('click', async () =>
     return;
   }
 
-  const hash = await sha256(pw);
+  const passwordHash = await sha256(pw);
 
-  if (ADMIN_SETUP_MODE) {
-    // 최초 설정: 비밀번호 해시를 DB에 저장
-    await dbSet('config/admin/passwordHash', hash);
-    showToast('관리자 비밀번호가 설정되었습니다.');
-    enterAdminPanel();
-    return;
-  }
+  const res  = await fetch('/api/admin/verify', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ passwordHash }),
+  });
+  const data = await res.json();
 
-  const storedHash = await dbGet('config/admin/passwordHash');
-  if (!storedHash) {
-    errEl.textContent = '관리자 비밀번호가 설정되지 않았습니다. ADMIN_SETUP_MODE를 true로 변경하세요.';
+  if (!data.ok) {
+    errEl.textContent = data.error || '인증 실패';
     errEl.classList.add('visible');
     return;
   }
 
-  if (hash !== storedHash) {
-    errEl.textContent = '비밀번호가 틀렸습니다.';
-    errEl.classList.add('visible');
-    return;
-  }
-
+  if (data.firstSetup) showToast('관리자 비밀번호가 설정되었습니다.');
+  adminToken = data.token;
   enterAdminPanel();
 });
 
@@ -232,29 +228,48 @@ document.getElementById('btn-give-hydrogen').addEventListener('click', async () 
     return;
   }
 
-  const userKey  = nick.toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
-  const userData = await dbGet(`users/${userKey}`);
-  if (!userData) {
-    errEl.textContent = `유저 "${nick}"를 찾을 수 없습니다.`;
+  const userKey = nick.toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
+  const res = await fetch('/api/admin/give-hydrogen', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'X-Admin-Token': adminToken || '',
+    },
+    body: JSON.stringify({ userKey, amount }),
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    showToast(`${nick}에게 ${formatNumber(amount)} 수소 지급 완료!`);
+    document.getElementById('give-nickname').value = '';
+    document.getElementById('give-amount').value   = '';
+    await loadUsers();
+  } else {
+    errEl.textContent = data.error || '지급 실패';
     errEl.classList.add('visible');
-    return;
   }
-
-  const newHydrogen = (userData.hydrogen || 0) + amount;
-  await dbUpdate(`users/${userKey}`, { hydrogen: newHydrogen });
-
-  showToast(`${userData.nickname}에게 ${formatNumber(amount)} 수소 지급 완료!`);
-  document.getElementById('give-nickname').value = '';
-  document.getElementById('give-amount').value   = '';
-  await loadUsers();
 });
 
 async function toggleBan(userKey, nickname, currentlyBanned) {
   const action = currentlyBanned ? '벤을 해제' : '벤';
   if (!confirm(`${nickname} 님을 ${action}하시겠습니까?`)) return;
-  await dbUpdate(`users/${userKey}`, { banned: !currentlyBanned });
-  showToast(`${nickname} ${currentlyBanned ? '벤 해제' : '벤'} 완료`);
-  await loadUsers();
+
+  const res = await fetch('/api/admin/ban', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'X-Admin-Token': adminToken || '',
+    },
+    body: JSON.stringify({ userKey, banned: !currentlyBanned }),
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    showToast(`${nickname} ${currentlyBanned ? '벤 해제' : '벤'} 완료`);
+    await loadUsers();
+  } else {
+    showToast(data.error || '처리 실패');
+  }
 }
 
 function escapeHtml(str) {

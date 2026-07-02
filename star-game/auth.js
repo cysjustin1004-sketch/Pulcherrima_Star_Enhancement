@@ -1,6 +1,6 @@
 // ============================================================
 // auth.js — 회원가입 / 로그인 / 세션 유지
-// Firebase Auth 대신 Realtime DB + SHA-256 해시 사용
+// 서버 API 기반: /api/auth/login, /api/auth/register
 // ============================================================
 
 const SESSION_KEY = 'star_session'; // localStorage 키
@@ -12,7 +12,7 @@ function nicknameToKey(nickname) {
   return nickname.trim().toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
 }
 
-/** SHA-256 해시 (WebCrypto API) */
+/** SHA-256 해시 (WebCrypto API) — 로그인 시 클라이언트가 해싱 후 전송 */
 async function sha256(text) {
   const buf = await crypto.subtle.digest(
     'SHA-256',
@@ -25,18 +25,30 @@ async function sha256(text) {
 
 // ─── 세션 ───────────────────────────────────────────────────
 
-/** 현재 로그인된 유저 정보 반환 (없으면 null) */
+/** 현재 로그인된 세션 반환 (없으면 null) */
 function getSession() {
   try {
-    return JSON.parse(localStorage.getItem(SESSION_KEY));
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY));
+    // 구 형식 세션(token 없음)은 무효 처리
+    if (s && !s.token) {
+      localStorage.removeItem(SESSION_KEY);
+      return null;
+    }
+    return s;
   } catch {
     return null;
   }
 }
 
-/** 세션 저장 */
-function setSession(userKey, nickname) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify({ userKey, nickname }));
+/** 세션 토큰 반환 (API 호출 시 X-Session-Token 헤더에 사용) */
+function getToken() {
+  const s = getSession();
+  return s ? s.token : null;
+}
+
+/** 세션 저장 — token이 추가됨 */
+function setSession(token, userKey, nickname) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ token, userKey, nickname }));
 }
 
 /** 로그아웃 */
@@ -47,7 +59,7 @@ function clearSession() {
 /** 로그인 안 됐으면 login.html로 리다이렉트 */
 function requireAuth() {
   const session = getSession();
-  if (!session) {
+  if (!session || !session.token) {
     window.location.href = 'login.html';
     return null;
   }
@@ -57,7 +69,7 @@ function requireAuth() {
 // ─── 회원가입 ───────────────────────────────────────────────
 
 /**
- * 회원가입
+ * 회원가입 — /api/auth/register 호출
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
 async function register(nickname, password) {
@@ -70,46 +82,28 @@ async function register(nickname, password) {
     return { ok: false, error: '비밀번호는 4자 이상이어야 합니다.' };
   }
 
-  const userKey = nicknameToKey(nick);
-  const existing = await dbGet(`users/${userKey}`);
-  if (existing) {
-    return { ok: false, error: '이미 사용 중인 닉네임입니다.' };
-  }
-
   const passwordHash = await sha256(password);
-  const now = Date.now();
 
-  await dbSet(`users/${userKey}`, {
-    nickname: nick,
-    passwordHash,
-    hydrogen: STARTING_HYDROGEN,
-    currentStar: 0,
-    bestStar: 0,
-    protectionScrolls: 0,
-    unlockedCodex: [0],   // +0은 처음부터 해금
-    items: {
-      stellar_wind: 0,
-      hypergiant_core: 0,
-      supernova_glow: 0,
-      neutron_crust: 0,
-      pulsar_signal: 0,
-      magnetar_flare: 0,
-      hawking_radiation: 0,
-      dark_matter: 0,
-    },
-    storedStars: {},       // { level: count } 형태
-    rateWindow: { startMs: now, count: 0 },
-    createdAt: now,
-  });
+  try {
+    const res  = await fetch('/api/auth/register', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ nickname: nick, passwordHash }),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || '회원가입 실패' };
 
-  setSession(userKey, nick);
-  return { ok: true };
+    setSession(data.token, data.userKey, data.nickname);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: '서버 연결 오류' };
+  }
 }
 
 // ─── 로그인 ───────────────────────────────────────────────
 
 /**
- * 로그인
+ * 로그인 — /api/auth/login 호출
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
 async function login(nickname, password) {
@@ -118,24 +112,27 @@ async function login(nickname, password) {
     return { ok: false, error: '닉네임과 비밀번호를 입력하세요.' };
   }
 
-  const userKey = nicknameToKey(nick);
-  const user = await dbGet(`users/${userKey}`);
-  if (!user) {
-    return { ok: false, error: '존재하지 않는 닉네임입니다.' };
-  }
+  const passwordHash = await sha256(password);
 
-  const hash = await sha256(password);
-  if (hash !== user.passwordHash) {
-    return { ok: false, error: '비밀번호가 틀렸습니다.' };
-  }
+  try {
+    const res  = await fetch('/api/auth/login', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ nickname: nick, passwordHash }),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || '로그인 실패' };
 
-  setSession(userKey, user.nickname);
-  return { ok: true };
+    setSession(data.token, data.userKey, data.nickname);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: '서버 연결 오류' };
+  }
 }
 
 // ─── 유저 데이터 로드 ────────────────────────────────────────
 
-/** 현재 세션 유저의 DB 데이터 로드 (벤 체크 포함) */
+/** 현재 세션 유저의 DB 데이터 로드 (Firebase 직접 읽기, 벤 체크 포함) */
 async function loadCurrentUser() {
   const session = getSession();
   if (!session) return null;

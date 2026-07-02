@@ -28,7 +28,7 @@
     <div style="font-size:0.85rem; color:var(--text-sub); margin-bottom:0.5rem;" id="protection-desc"></div>
     <div class="result-actions">
       <button class="btn-success" id="btn-use-protection">붕괴 방지권 사용</button>
-      <button class="btn-danger"  id="btn-skip-protection">그냥 하락 수용</button>
+      <button class="btn-danger"  id="btn-skip-protection">확인 (0강부터 시작)</button>
     </div>
   </div>
 
@@ -64,7 +64,7 @@
     <div class="star-subname" id="star-subname">M42</div>
 
     <div class="star-visual">
-      <div class="star-core type-nebula" id="star-core"></div>
+      <img class="star-img" id="star-core" src="images/star_0.png" alt="">
     </div>
 
     <div class="star-type-badge" id="star-type-badge">성간 가스 구름</div>
@@ -156,12 +156,12 @@ if (!session) throw new Error('no session');
 
 // 전역 상태
 let currentUser = null;
-// 실패 시 임시 저장: 드랍 처리 여부를 추적하기 위해
+// 실패 흐름 추적 (서버 pendingFailure 결과 기반)
 let pendingState = {
-  failed: false,
-  drop: null,
+  failed:       false,
+  drop:         null,  // 서버에서 반환한 드랍 정보 { key, amount }
   dropPickedUp: false,
-  needFallback: false, // 방지권 선택 후 하락 여부
+  failedLevel:  0,     // 강화 실패한 단계 (방지권 비용 계산에 사용)
 };
 
 // ─── UI 업데이트 ────────────────────────────────────
@@ -183,8 +183,7 @@ function updateUI(user) {
   document.getElementById('star-type-badge').textContent  = stage.type;
 
   const coreEl = document.getElementById('star-core');
-  // CSS 타입 클래스 교체
-  coreEl.className = 'star-core ' + getStarCssClass(level);
+  coreEl.src = `images/star_${level}.png`;
 
   // 강화 정보
   if (stage.cost === null) {
@@ -324,115 +323,102 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
   const level = currentUser.currentStar;
   const stage = STAGES[level];
 
-  const result = enhance(currentUser);
+  // 서버 API 호출 (인증 + 판정 + Firebase 쓰기를 서버에서 처리)
+  const result = await enhance();
 
-  if (result.blocked || result.error) {
+  if (!result.ok) {
+    btn.disabled = false;
     showOverlay('⚠️ 주의', '', result.error || '오류가 발생했습니다.');
     showConfirmButton();
     document.getElementById('btn-confirm').onclick = async () => {
       hideOverlay();
-      await reload();
+      btn.disabled = false;
     };
     return;
   }
 
-  // 비용을 로컬에 즉시 반영 (Firebase에는 enhance()가 이미 차감함)
-  if (stage.cost) {
-    if (stage.cost.type === 'hydrogen') currentUser.hydrogen -= stage.cost.amount;
-    else if (stage.cost.type === 'item') currentUser.items[stage.cost.key] -= stage.cost.amount;
-    else if (stage.cost.type === 'star') {
-      if (!currentUser.storedStars) currentUser.storedStars = {};
-      currentUser.storedStars[stage.cost.level] -= stage.cost.amount;
-    }
-  }
-
   if (result.success) {
-    // Firebase 재조회 없이 로컬 상태만 업데이트 → 즉각 반응
-    const newLevel = level + 1;
+    // 성공: 서버가 currentStar 증가시킴 — 로컬 상태에도 즉시 반영 (재조회 불필요)
+    const newLevel = result.level + 1;
+    // 비용을 로컬에서도 차감 (UI 갱신용)
+    if (stage.cost) {
+      if (stage.cost.type === 'hydrogen') currentUser.hydrogen = Math.max(0, (currentUser.hydrogen || 0) - stage.cost.amount);
+      else if (stage.cost.type === 'item' && currentUser.items) currentUser.items[stage.cost.key] = Math.max(0, (currentUser.items[stage.cost.key] || 0) - stage.cost.amount);
+      else if (stage.cost.type === 'star') {
+        if (!currentUser.storedStars) currentUser.storedStars = {};
+        currentUser.storedStars[stage.cost.level] = Math.max(0, (currentUser.storedStars[stage.cost.level] || 0) - stage.cost.amount);
+      }
+    }
     currentUser.currentStar = newLevel;
     if (newLevel > (currentUser.bestStar || 0)) currentUser.bestStar = newLevel;
     const unlocked = currentUser.unlockedCodex || [];
     if (!unlocked.includes(newLevel)) currentUser.unlockedCodex = [...unlocked, newLevel];
     updateUI(currentUser);
+    btn.disabled = false;
   } else {
-    // 실패
+    // 실패: 서버가 pendingFailure 저장. 드랍/방지권 흐름 시작
     pendingState = {
-      failed: true,
-      drop: result.drop,
+      failed:       true,
+      drop:         result.drop,  // { key, amount } 또는 null
       dropPickedUp: false,
-      needFallback: level >= 4 && stage.protectionCost !== 0, // 0강~3강은 하락 없음
+      failedLevel:  result.level,
     };
-
-    showOverlay('💥 강화 실패', 'fail', `${stage.name} (+${level}강) 강화에 실패했습니다.`);
     advanceFailureFlow();
   }
 });
 
-/** 실패 후 단계별로 줍기 → 방지권 → 확인 순으로 진행 */
+/** 실패 후 방지권 선택 → 확인 순으로 진행 (드랍은 서버에서 자동 지급) */
 async function advanceFailureFlow() {
-  // 1단계: 드랍 아이템 줍기
-  if (pendingState.drop && !pendingState.dropPickedUp) {
+  // 드랍 아이템은 서버에서 자동 지급됨 — 토스트로 알림만 표시
+  if (pendingState.drop) {
     const drop = pendingState.drop;
-    const pickupSection = document.getElementById('pickup-section');
-    const btnPickup     = document.getElementById('btn-pickup');
-    btnPickup.textContent = `줍기 — ${ITEM_NAMES[drop.key]} ${drop.amount}개`;
-    pickupSection.style.display = '';
-
-    btnPickup.onclick = async () => {
-      pickupSection.style.display = 'none';
-      await pickupItem(currentUser, drop.key, drop.amount);
-      pendingState.dropPickedUp = true;
-      showToast(`${ITEM_NAMES[drop.key]} ${drop.amount}개를 주웠습니다.`);
-      advanceFailureFlow();
-    };
-    return;
+    showToast(`${ITEM_NAMES[drop.key]} ${drop.amount}개를 획득했습니다.`);
   }
 
-  // 2단계: 방지권 선택 (하락 위기 + 방지권 보유 시)
-  if (pendingState.needFallback) {
-    const level = currentUser.currentStar;
-    const stage = STAGES[level];
-    const canProtect = stage.protectionCost > 0 && (currentUser.protectionScrolls || 0) >= stage.protectionCost;
+  // 방지권 선택 (4강 이상이고 방지 가능한 단계)
+  const failedLevel = pendingState.failedLevel;
+  const failedStage = STAGES[failedLevel];
+  const needFallback = failedLevel >= 4; // 0~3강은 하락 없음
+  const canProtect = failedStage.protectionCost > 0 && (currentUser.protectionScrolls || 0) >= failedStage.protectionCost;
 
+  if (needFallback) {
     if (canProtect) {
+      // 방지권을 쓸 수 있는 경우엔 실패 안내 없이 방지권 선택 창만 표시.
+      // 버튼 클릭 한 번으로 바로 결정 → 오버레이 닫힘 (확인 단계 없음)
+      showOverlay('🛡 방지권 선택', '', '');
       const protSection = document.getElementById('protection-section');
       document.getElementById('protection-desc').textContent =
-        `방지권 ${stage.protectionCost}개를 사용하면 +${level}강을 유지할 수 있습니다. (보유: ${currentUser.protectionScrolls})`;
+        `${failedStage.name} (+${failedLevel}강) 강화에 실패했습니다. 방지권 ${failedStage.protectionCost}개를 사용하면 단계를 유지하고, 사용하지 않으면 0강부터 다시 시작합니다. (보유: ${currentUser.protectionScrolls || 0})`;
       protSection.style.display = '';
 
       document.getElementById('btn-use-protection').onclick = async () => {
-        protSection.style.display = 'none';
-        const res = await useProtectionScroll(currentUser);
+        const res = await useProtectionScroll();
         if (res.ok) {
-          showToast(`방지권 ${stage.protectionCost}개 소모 — 단계 유지!`);
-          pendingState.needFallback = false;
+          showToast(`방지권 ${failedStage.protectionCost}개 소모 — 단계 유지!`);
         } else {
-          showToast(res.error || '방지 실패');
-          // 방지 실패 시 하락 처리
-          await applyFallback(currentUser);
+          showToast(res.error || '방지 실패, 0강부터 다시 시작합니다.');
+          await applyFallback();
         }
-        showConfirmButton();
-        document.getElementById('btn-confirm').onclick = async () => {
-          hideOverlay();
-          await reload();
-        };
+        hideOverlay();
+        await reload();
+        document.getElementById('btn-enhance').disabled = false;
       };
 
       document.getElementById('btn-skip-protection').onclick = async () => {
-        protSection.style.display = 'none';
-        await applyFallback(currentUser);
-        pendingState.needFallback = false;
-        showConfirmButton();
-        document.getElementById('btn-confirm').onclick = async () => {
-          hideOverlay();
-          await reload();
-        };
+        await applyFallback();
+        hideOverlay();
+        await reload();
+        document.getElementById('btn-enhance').disabled = false;
       };
       return;
     } else {
-      // 방지권 없거나 방지 불가 → 즉시 하락
-      await applyFallback(currentUser);
+      // 방지권 없거나 방지 불가 단계 → 실패 안내 후 즉시 하락 처리
+      showOverlay('💥 강화 실패', 'fail', `${failedStage.name} (+${failedLevel}강) 강화에 실패했습니다.`);
+      await applyFallback();
     }
+  } else {
+    // 하락 없는 구간(0~3강) → 실패 안내만 표시
+    showOverlay('💥 강화 실패', 'fail', `${failedStage.name} (+${failedLevel}강) 강화에 실패했습니다.`);
   }
 
   // 3단계: 확인 버튼
@@ -440,6 +426,7 @@ async function advanceFailureFlow() {
   document.getElementById('btn-confirm').onclick = async () => {
     hideOverlay();
     await reload();
+    document.getElementById('btn-enhance').disabled = false;
   };
 }
 
@@ -452,10 +439,12 @@ async function handleSell() {
 
   if (!confirm(`+${currentUser.currentStar}강 별(${stage.name})을 ${formatNumber(stage.sellPrice)} 수소에 판매하시겠습니까?`)) return;
 
-  const result = await sellStar(currentUser);
+  const result = await sellStar();
   if (result.ok) {
     showToast(`${stage.name}을 ${formatNumber(result.gained)} 수소에 판매했습니다.`);
     await reload();
+  } else {
+    showToast(result.error || '판매 오류');
   }
 }
 
@@ -464,15 +453,17 @@ async function handleSell() {
 document.getElementById('btn-store').addEventListener('click', async () => {
   if (!currentUser) return;
   const level = currentUser.currentStar;
-  if (level < 1) return;
+  if (level < 19) return;
 
   const stage = STAGES[level];
   if (!confirm(`+${level}강 별(${stage.name})을 보관하시겠습니까?\n보관된 별은 조합소에서 사용할 수 있습니다.`)) return;
 
-  const result = await storeStar(currentUser);
+  const result = await storeStar();
   if (result.ok) {
     showToast(`${stage.name}(+${level}강) 1개를 보관했습니다.`);
     await reload();
+  } else {
+    showToast(result.error || '보관 오류');
   }
 });
 

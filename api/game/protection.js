@@ -1,6 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { STAGES } = require('../../lib/game-config');
+const { resolveStage } = require('../../lib/game-config');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
@@ -22,7 +22,7 @@ module.exports = async (req, res) => {
 
   const { useProtection } = req.body;
   const level = pf.level;
-  const stage = STAGES[level];
+  const stage = resolveStage(level, user.track);
 
   if (useProtection) {
     // 방지권 사용 — 단계 유지

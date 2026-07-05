@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>도감 — 별 강화하기</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Sora:wght@700;900&family=Hanken+Grotesk:wght@400;500;700;900&family=Geist:wght@700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -23,14 +23,26 @@
   </div>
 </div>
 
+<div class="top-header">
+  <div class="top-header-logo">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L14.4 9.2L22 12L14.4 14.8L12 22L9.6 14.8L2 12L9.6 9.2L12 2Z" fill="black"/>
+    </svg>
+  </div>
+  <div class="top-header-title">도감</div>
+</div>
+
 <div class="page">
-  <h1 class="page-title">📖 도감</h1>
   <div style="font-size:0.82rem; color:var(--text-sub); text-align:center; margin-bottom:1rem;" id="unlock-count">
     해금: 로딩 중...
   </div>
 
-  <!-- 도감 목록 -->
-  <div class="codex-grid" id="codex-grid"></div>
+  <!-- 공통 구간 -->
+  <div class="card-title" style="padding:0.25rem 0 0.5rem;">공통 (+0 ~ +16)</div>
+  <div class="codex-grid" id="codex-grid-common"></div>
+
+  <!-- 트랙별 구간 -->
+  <div id="codex-tracks"></div>
 </div>
 
 <!-- 하단 네비게이션 -->
@@ -59,6 +71,8 @@
 const session = requireAuth();
 if (!session) throw new Error('no session');
 
+const TOTAL_ENTRIES = COMMON_STAGES.length + Object.keys(TRACKS).length * TRACKS.track1.length;
+
 function handleModalBgClick(e) {
   // 배경(bg) 클릭 시만 닫기 — 모달 내부 클릭은 무시
   if (e.target === document.getElementById('codex-modal-bg')) {
@@ -66,17 +80,42 @@ function handleModalBgClick(e) {
   }
 }
 
-function openEntry(level) {
-  const stage = STAGES[level];
+function openEntry(level, track) {
+  const stage = resolveStage(level, track);
   document.getElementById('modal-level').textContent = `+${level}강`;
   document.getElementById('modal-name').textContent  = stage.name;
   document.getElementById('modal-sub').textContent   = `${stage.subname} · ${stage.type}`;
   document.getElementById('modal-desc').textContent  = stage.codexDescription;
 
   const visualEl = document.getElementById('modal-star-visual');
-  visualEl.innerHTML = `<img src="images/star_${level}.png" alt="" style="width:140px;height:140px;object-fit:contain;filter:brightness(1.05) saturate(1.2);">`;
+  visualEl.innerHTML = `<img src="${starImagePath(level, track)}" alt="" style="width:140px;height:140px;object-fit:contain;filter:brightness(1.05) saturate(1.2);">`;
 
   document.getElementById('codex-modal-bg').classList.add('visible');
+}
+
+/** 공통/트랙 도감 카드 하나를 만든다 */
+function buildCodexItem(level, track, stage, isUnlocked) {
+  const item = document.createElement('div');
+  item.className = 'codex-item ' + (isUnlocked ? 'unlocked' : 'locked');
+
+  item.innerHTML = `
+    <div class="codex-level-badge">+${level}</div>
+    <div>
+      ${isUnlocked
+        ? `<img src="${starImagePath(level, track)}" class="codex-star-thumb" alt="">`
+        : '<div class="codex-star-lock">?</div>'}
+    </div>
+    <div class="codex-info">
+      <div class="codex-name">${isUnlocked ? stage.name : '???'}</div>
+      <div class="codex-type">${isUnlocked ? stage.type : '미해금'}</div>
+    </div>
+  `;
+
+  if (isUnlocked) {
+    item.addEventListener('click', () => openEntry(level, track));
+  }
+
+  return item;
 }
 
 async function renderCodex() {
@@ -85,35 +124,37 @@ async function renderCodex() {
 
   const unlocked = user.unlockedCodex || [];
   document.getElementById('unlock-count').textContent =
-    `해금: ${unlocked.length} / ${STAGES.length}`;
+    `해금: ${unlocked.length} / ${TOTAL_ENTRIES}`;
 
-  const grid = document.getElementById('codex-grid');
-  grid.innerHTML = '';
+  // 공통 구간
+  const commonGrid = document.getElementById('codex-grid-common');
+  commonGrid.innerHTML = '';
+  COMMON_STAGES.forEach((stage, level) => {
+    const isUnlocked = unlocked.includes(stageKey(level, null));
+    commonGrid.appendChild(buildCodexItem(level, null, stage, isUnlocked));
+  });
 
-  STAGES.forEach((stage, level) => {
-    const isUnlocked = unlocked.includes(level);
+  // 트랙 구간 — 5개 섹션. 아직 가보지 않은 트랙도 전부 표시(수집 목표)
+  const tracksEl = document.getElementById('codex-tracks');
+  tracksEl.innerHTML = '';
+  Object.entries(TRACKS).forEach(([trackKey, stages]) => {
+    const section = document.createElement('div');
 
-    const item = document.createElement('div');
-    item.className = 'codex-item ' + (isUnlocked ? 'unlocked' : 'locked');
+    const title = document.createElement('div');
+    title.className = 'card-title';
+    title.style.cssText = 'padding:1rem 0 0.5rem;';
+    title.textContent = `${TRACK_INFO[trackKey].name} (+17 ~ +24)`;
+    section.appendChild(title);
 
-    item.innerHTML = `
-      <div class="codex-level-badge">+${level}</div>
-      <div>
-        ${isUnlocked
-          ? `<img src="images/star_${level}.png" class="codex-star-thumb" alt="">`
-          : '<div class="codex-star-lock">?</div>'}
-      </div>
-      <div class="codex-info">
-        <div class="codex-name">${isUnlocked ? stage.name : '???'}</div>
-        <div class="codex-type">${isUnlocked ? stage.type : '미해금'}</div>
-      </div>
-    `;
+    const grid = document.createElement('div');
+    grid.className = 'codex-grid';
+    stages.forEach(stage => {
+      const isUnlocked = unlocked.includes(stageKey(stage.level, trackKey));
+      grid.appendChild(buildCodexItem(stage.level, trackKey, stage, isUnlocked));
+    });
+    section.appendChild(grid);
 
-    if (isUnlocked) {
-      item.addEventListener('click', () => openEntry(level));
-    }
-
-    grid.appendChild(item);
+    tracksEl.appendChild(section);
   });
 }
 

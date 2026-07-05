@@ -54,6 +54,15 @@
       </div>
     </div>
 
+    <!-- 위험 구역: 게임 구조 개편(v2)에 따른 전체 유저 데이터 초기화 -->
+    <div class="card" style="border-color:var(--danger);">
+      <div class="card-title" style="color:var(--danger);">위험 구역 — 전체 유저 데이터 초기화</div>
+      <div style="font-size:0.82rem; color:var(--text-sub); margin-bottom:0.75rem;">
+        공통 17단계 + 5트랙 분기 구조(v2)로 게임을 개편하면서 옛 구조로 저장된 유저/로그/비밀번호 데이터를 모두 삭제합니다. 되돌릴 수 없습니다.
+      </div>
+      <button class="btn-danger" id="btn-wipe-users" style="width:100%;">전체 유저 데이터 삭제</button>
+    </div>
+
     <!-- 강화 로그 조회 -->
     <div class="card" id="log-section" style="display:none;">
       <div class="card-title">강화 로그 — <span id="log-user-name"></span></div>
@@ -271,6 +280,34 @@ async function toggleBan(userKey, nickname, currentlyBanned) {
     showToast(data.error || '처리 실패');
   }
 }
+
+// ─── 위험 구역: 전체 유저 데이터 초기화 ─────────────
+
+document.getElementById('btn-wipe-users').addEventListener('click', async () => {
+  const phrase = '전체 유저 데이터 삭제';
+  const input = prompt(`정말 모든 유저 데이터를 삭제하시겠습니까? 되돌릴 수 없습니다.\n계속하려면 아래에 정확히 입력하세요: ${phrase}`);
+  if (input !== phrase) {
+    if (input !== null) showToast('확인 문구가 일치하지 않아 취소되었습니다.');
+    return;
+  }
+
+  const res = await fetch('/api/admin/wipe-users', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'X-Admin-Token': adminToken || '',
+    },
+    body: JSON.stringify({ confirm: phrase }),
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    showToast('전체 유저 데이터가 삭제되었습니다.');
+    await loadUsers();
+  } else {
+    showToast(data.error || '삭제 실패');
+  }
+});
 
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

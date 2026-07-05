@@ -1,6 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { SHOP_ITEMS } = require('../../lib/game-config');
+const { SHOP_ITEMS, stageKey } = require('../../lib/game-config');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
@@ -27,9 +27,10 @@ module.exports = async (req, res) => {
     // 도약권: currentStar를 해당 레벨로 설정
     upd[`users/${userKey}/currentStar`] = item.targetLevel;
     const unlocked = user.unlockedCodex || [];
-    // 도약 경로의 모든 단계를 도감 해금
+    // 도약 경로의 모든 단계를 도감 해금 (도약권은 전부 공통 구간 내이므로 트랙 불필요)
     for (let lv = 1; lv <= item.targetLevel; lv++) {
-      if (!unlocked.includes(lv)) unlocked.push(lv);
+      const key = stageKey(lv, user.track);
+      if (!unlocked.includes(key)) unlocked.push(key);
     }
     upd[`users/${userKey}/unlockedCodex`] = unlocked;
     if (item.targetLevel > (user.bestStar || 0)) {

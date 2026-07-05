@@ -26,9 +26,9 @@ module.exports = async (req, res) => {
   }
 
   const now = Date.now();
+  await db.ref(`authSecrets/${userKey}`).set({ passwordHash });
   await db.ref(`users/${userKey}`).set({
     nickname: nick,
-    passwordHash,
     hydrogen: STARTING_HYDROGEN,
     currentStar: 0,
     bestStar: 0,

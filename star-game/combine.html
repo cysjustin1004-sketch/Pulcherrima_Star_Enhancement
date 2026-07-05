@@ -5,28 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>조합소 — 별 강화하기</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Sora:wght@700;900&family=Hanken+Grotesk:wght@400;500;700;900&family=Geist:wght@700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="page">
-  <h1 class="page-title">🔧 조합소</h1>
-
-  <!-- 인벤토리 요약 -->
-  <div class="card" id="inventory-card">
-    <div class="card-title">보유 아이템</div>
-    <div id="inventory-list" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
+<div class="top-header">
+  <div class="top-header-logo">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L14.4 9.2L22 12L14.4 14.8L12 22L9.6 14.8L2 12L9.6 9.2L12 2Z" fill="black"/>
+    </svg>
   </div>
+  <div class="top-header-title">인벤토리 · 조합소</div>
+</div>
+
+<div class="page">
+
+  <!-- 보유 아이템 -->
+  <section class="inv-section">
+    <div class="inv-section-head">
+      <span class="inv-section-title">보유 아이템</span>
+      <span class="inv-section-count" id="inventory-count">-</span>
+    </div>
+    <div class="item-slot-grid" id="inventory-list"></div>
+  </section>
 
   <!-- 보관된 별 -->
-  <div class="card" id="stored-stars-card">
-    <div class="card-title">보관된 별</div>
-    <div id="stored-stars-list" style="display:flex; flex-direction:column; gap:0.4rem;"></div>
-  </div>
+  <section class="inv-section">
+    <div class="inv-section-head">
+      <span class="inv-section-title">보관된 별</span>
+    </div>
+    <div class="item-slot-grid" id="stored-stars-list"></div>
+  </section>
 
   <!-- 레시피 목록 -->
-  <div class="card-title" style="padding:0.25rem 0 0.5rem; font-size:0.78rem; font-weight:700; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.07em;">레시피</div>
+  <div class="card-title" style="padding:0.25rem 0 0.5rem;">레시피</div>
   <div id="recipe-list"></div>
 </div>
 
@@ -70,58 +83,72 @@ function showToast(msg) {
 function formatOutputDesc(output) {
   if (output.type === 'protection') return `붕괴 방지권 ${output.amount}개`;
   if (output.type === 'star') {
-    const stage = STAGES[output.level];
+    // trackRelative 레시피는 항상 제작자 본인 트랙 기준으로 해석
+    const track = output.level >= 17 ? currentUser.track : null;
+    const stage = resolveStage(output.level, track);
     return `${stage ? stage.name : ''}(+${output.level}강) 별 1개`;
   }
   return '?';
 }
 
+// 아이템 종류별 대표 아이콘 (그림 리소스가 없어 문자로 대체)
+const ITEM_ICONS = {
+  [ITEM_KEYS.STELLAR_WIND]:    'W',
+  [ITEM_KEYS.HYPERGIANT_CORE]: 'C',
+  [ITEM_KEYS.SUPERNOVA_GLOW]:  'G',
+  [ITEM_KEYS.NEUTRON_CRUST]:   'N',
+  [ITEM_KEYS.PULSAR_SIGNAL]:   'P',
+  [ITEM_KEYS.MAGNETAR_FLARE]:  'M',
+  [ITEM_KEYS.HAWKING]:         'H',
+  [ITEM_KEYS.DARK_MATTER]:     'D',
+};
+
 function renderAll(user) {
   currentUser = user;
 
-  // ── 인벤토리 표시 ──
+  // ── 인벤토리 표시 (슬롯 그리드) ──
   const invList = document.getElementById('inventory-list');
   invList.innerHTML = '';
+  let heldCount = 0;
   Object.entries(ITEM_NAMES).forEach(([key, name]) => {
     const count = (user.items && user.items[key]) || 0;
     const warning = IMPORTANT_ITEM_WARNINGS[key] || '';
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;';
-    row.innerHTML = `
-      <span>${name}${warning ? ' <span style="font-size:0.75rem; color:var(--danger);">⚠</span>' : ''}</span>
-      <span style="font-weight:700; color:${count > 0 ? 'var(--accent)' : 'var(--text-sub)'};">${count}개</span>
-    `;
-    if (warning && count > 0) {
-      const warnEl = document.createElement('div');
-      warnEl.style.cssText = 'font-size:0.75rem; color:var(--danger); margin-top:2px;';
-      warnEl.textContent = warning;
-      // 경고 행을 별도로 추가
-      const wrapper = document.createElement('div');
-      wrapper.appendChild(row);
-      wrapper.appendChild(warnEl);
-      invList.appendChild(wrapper);
-    } else {
-      invList.appendChild(row);
-    }
-  });
+    if (count > 0) heldCount++;
 
-  // ── 보관된 별 ──
+    const slot = document.createElement('div');
+    slot.className = 'item-slot' + (count === 0 ? ' empty' : '') + (warning && count > 0 ? ' warn' : '');
+    if (warning && count > 0) slot.title = warning;
+    slot.innerHTML = `
+      <div class="item-slot-icon">${ITEM_ICONS[key] || '?'}</div>
+      <div class="item-slot-name">${name}</div>
+      <div class="item-slot-count">${count}개</div>
+      ${warning && count > 0 ? '<div class="item-slot-warn">!</div>' : ''}
+    `;
+    invList.appendChild(slot);
+  });
+  document.getElementById('inventory-count').textContent =
+    `${heldCount} / ${Object.keys(ITEM_NAMES).length}`;
+
+  // ── 보관된 별 (슬롯 그리드) ──
   const starList = document.getElementById('stored-stars-list');
   starList.innerHTML = '';
   const stored = user.storedStars || {};
   const storedEntries = Object.entries(stored).filter(([, cnt]) => cnt > 0);
   if (storedEntries.length === 0) {
-    starList.innerHTML = '<div style="font-size:0.85rem; color:var(--text-sub);">보관된 별이 없습니다.</div>';
+    starList.innerHTML = '<div class="inv-empty-note">보관된 별이 없습니다.</div>';
   } else {
-    storedEntries.forEach(([level, cnt]) => {
-      const stage = STAGES[parseInt(level)];
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex; justify-content:space-between; align-items:center; font-size:0.9rem;';
-      row.innerHTML = `
-        <span>${stage ? stage.name : '?'}(+${level}강)</span>
-        <span style="font-weight:700; color:var(--accent);">${cnt}개</span>
+    storedEntries.forEach(([key, cnt]) => {
+      const { level, track } = parseStageKey(key);
+      const stage = resolveStage(level, track);
+      const slot = document.createElement('div');
+      slot.className = 'item-slot';
+      slot.innerHTML = `
+        <div class="item-slot-badge">+${level}</div>
+        <img class="item-slot-img" src="${starImagePath(level, track)}" alt="">
+        <div class="item-slot-name">${stage ? stage.name : '?'}</div>
+        <div class="item-slot-count">${cnt}개</div>
       `;
-      starList.appendChild(row);
+      starList.appendChild(slot);
     });
   }
 
@@ -174,8 +201,9 @@ async function handleCraft(recipe) {
     if (out.type === 'protection') {
       showToast(`붕괴 방지권 ${out.amount}개 획득!`);
     } else if (out.type === 'star') {
-      const stageName = STAGES[out.level] ? STAGES[out.level].name : `+${out.level}강`;
-      showToast(`${stageName}(+${out.level}강) 별 1개 획득!`);
+      const track = out.level >= 17 ? currentUser.track : null;
+      const stage = resolveStage(out.level, track);
+      showToast(`${stage ? stage.name : `+${out.level}강`}(+${out.level}강) 별 1개 획득!`);
     }
     await reload();
   } else {

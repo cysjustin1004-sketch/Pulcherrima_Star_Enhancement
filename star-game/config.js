@@ -1,6 +1,15 @@
 // ============================================================
 // config.js — 별 강화하기 게임 설정
 // 이 파일만 수정하면 게임 수치/이름/설명을 모두 바꿀 수 있습니다.
+//
+// 레벨 체계 (v2 — 공통 17단계 + 5트랙 분기):
+//   level 0~16  : 공통 구간 (성운 → 원시별 → 주계열 → 운명의 갈림길)
+//   level 17~24 : 트랙 구간 — level 16→17 강화 성공 시 서버가 5개 트랙 중
+//                 하나를 무작위 배정(user.track)하며, 이후 해당 트랙 고정.
+//                 트랙: track1(적색왜성) / track2(태양형 별) /
+//                       track3(대질량 별) / track4(초대질량 별) /
+//                       track5(극초대질량 별)
+//   level 24    : 각 트랙의 최종 엔딩 (강화 불가)
 // ============================================================
 
 // 아이템 키 (Firebase 저장 키로 사용)
@@ -28,24 +37,21 @@ const ITEM_NAMES = {
 };
 
 // ============================================================
-// 강화 단계 데이터 (+0 ~ +29)
+// 공통 단계 (+0 ~ +16) — 모든 유저 동일
 //
 // cost 형식:
-//   { type: 'hydrogen', amount: N }          수소 소모
-//   { type: 'item', key: ITEM_KEY, amount: N } 아이템 소모
-//   { type: 'star', level: N, amount: N }     보관된 별 소모
-//   null                                       강화 불가 (+29)
+//   { type: 'hydrogen', amount: N }            수소 소모
+//   { type: 'item', key: ITEM_KEY, amount: N }  아이템 소모
+//   { type: 'star', level: N, amount: N }       같은 트랙에 보관된 별 소모
+//   null                                         강화 불가
 //
-// protectionCost:
-//   0   = 하락 없음 (방지권 불필요)
-//   N>0 = 방지권 N개 소모로 하락 방지
-//   -1  = 방지권 불가 (+26~+28)
+// protectionCost: 0=하락 없음, N>0=방지권 N개로 하락 방지, -1=방지 불가
 // ============================================================
-const STAGES = [
+const COMMON_STAGES = [
   {
     level: 0,
-    name: '오리온 성운',
-    subname: 'M42',
+    name: '거대 분자운',
+    subname: '오리온 성운 · M42',
     type: '성간 가스 구름',
     cost: { type: 'hydrogen', amount: 500 },
     successRate: 1.00,
@@ -56,8 +62,8 @@ const STAGES = [
   },
   {
     level: 1,
-    name: '말머리 성운',
-    subname: 'IC 434',
+    name: '암흑 성운',
+    subname: '말머리 성운 · IC 434',
     type: '암흑 분자운',
     cost: { type: 'hydrogen', amount: 500 },
     successRate: 0.98,
@@ -68,350 +74,397 @@ const STAGES = [
   },
   {
     level: 2,
-    name: '독수리 성운',
-    subname: 'M16 · 창조의 기둥',
-    type: '방출 성운',
+    name: '보크 구체',
+    subname: 'Barnard 68',
+    type: '암흑 성운핵',
     cost: { type: 'hydrogen', amount: 1000 },
     successRate: 0.95,
     sellPrice: 500,
     protectionCost: 0,
     drop: null,
-    codexDescription: '【크기: 창조의 기둥 높이 약 4~5광년】 7,000광년 거리의 방출 성운. 전체 성운 직경은 약 70광년이며 질량은 태양의 약 8,000배다. 1995년 허블이 촬영한 창조의 기둥 사진은 현대 천문학의 아이콘이 되었다.',
+    codexDescription: '【크기: 약 2광년 / 거리: 약 500광년】 뱀주인자리에 있는 작고 매우 짙은 보크 구체. 뒤쪽 별빛을 완전히 가릴 만큼 밀도가 높아 마치 하늘에 뚫린 검은 구멍처럼 보인다. 이 자체 중력으로 수축하는 가스 덩어리가 별의 씨앗이 된다.',
   },
   {
     level: 3,
-    name: 'HL 타우리',
-    subname: 'HL Tau',
-    type: '원시별',
+    name: '중력 붕괴',
+    subname: '러닝치킨 성운 구체 · IC 2944',
+    type: '자체중력 수축',
     cost: { type: 'hydrogen', amount: 2000 },
     successRate: 0.93,
     sellPrice: 1000,
     protectionCost: 0,
     drop: null,
-    codexDescription: '【질량: 태양의 약 1배 / 원반 직경: 약 260 AU】 황소자리의 약 100만 년 된 원시별. 거리는 약 450광년. 2014년 ALMA가 촬영한 행성 형성 원반의 동심원 고리 구조는 태양계보다 이른 시기에 행성이 형성됨을 시사해 학계를 놀라게 했다.',
+    codexDescription: '【거리: 약 6,500광년】 용골자리 러닝치킨 성운(IC 2944) 안의 새커레이 구체들. 밀도가 임계점을 넘으면 압력이 중력을 버티지 못하고 단 한 방향, 안쪽으로만 무너져 내리기 시작한다.',
   },
   {
     level: 4,
-    name: '제타 퍼페이',
-    subname: 'ζ Puppis',
-    type: 'O형 주계열성',
+    name: '원시 항성핵',
+    subname: 'L1527 원시별',
+    type: '0등급 원시별',
     cost: { type: 'hydrogen', amount: 4000 },
     successRate: 0.90,
     sellPrice: 2000,
     protectionCost: 1,
     drop: null,
-    codexDescription: '【질량: 태양의 약 20배 / 반지름: 태양의 약 14배】 돛자리의 O형 초고온 청색 별. 표면 온도 약 42,000K로 태양보다 250,000배 밝다. 강렬한 항성풍으로 초당 수백만 톤의 물질을 날려보내며 약 1,400광년 거리에 위치한다.',
+    codexDescription: '【거리: 약 460광년】 황소자리 분자운 속의 어린 원시별. 주변을 두르는 납작한 원반과 모래시계 모양으로 뚫린 유출 공동이 스피처·제임스웹 우주망원경 적외선 영상에 뚜렷하게 담겨 있다.',
   },
   {
     level: 5,
-    name: '리겔',
-    subname: 'β Orionis',
-    type: '청색초거성',
+    name: '원시별',
+    subname: 'HL 타우리',
+    type: '원시별',
     cost: { type: 'hydrogen', amount: 7000 },
     successRate: 0.86,
     sellPrice: 6000,
     protectionCost: 1,
     drop: null,
-    codexDescription: '【질량: 태양의 약 21배 / 반지름: 태양의 약 78배】 오리온자리의 청색초거성. 863광년 거리에서 태양보다 120,000배 밝게 빛난다. 수명이 수백만 년에 불과하며 언젠가 초신성으로 폭발해 중성자별이나 블랙홀이 될 것이다.',
+    codexDescription: '【질량: 태양의 약 1배 / 원반 직경: 약 260 AU】 황소자리의 약 100만 년 된 원시별. 거리는 약 450광년. 2014년 ALMA가 촬영한 행성 형성 원반의 동심원 고리 구조는 태양계보다 이른 시기에 행성이 형성됨을 시사해 학계를 놀라게 했다.',
   },
   {
     level: 6,
-    name: '에타 용골자리',
-    subname: 'η Carinae',
-    type: '광도변광성 (LBV)',
+    name: '원시행성 원반',
+    subname: 'HD 163296',
+    type: '원시행성계 원반',
     cost: { type: 'hydrogen', amount: 10000 },
     successRate: 0.81,
     sellPrice: 15000,
     protectionCost: 1,
     drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
-    codexDescription: '【질량: 태양의 약 100~150배 / 반지름: 태양의 약 240배】 7,500광년 거리의 불안정한 극거성. 1840년대 대폭발로 태양의 수백만 배 에너지를 방출했다. 항성풍으로 매초 태양 질량의 천만분의 일을 잃고 있어 수명이 얼마 남지 않았다.',
+    codexDescription: '【거리: 약 330광년 / 나이: 약 500만 년】 궁수자리 방향의 젊은 별을 두른 원시행성계 원반. ALMA가 촬영한 여러 겹의 동심원 틈은 형성 중인 원시행성들이 궤도를 따라 물질을 쓸어 담고 있다는 유력한 증거로 꼽힌다.',
   },
   {
     level: 7,
-    name: 'WR 104',
-    subname: '볼프-레이에 별',
-    type: '볼프-레이에 별',
+    name: '허빅-하로 천체',
+    subname: '양극 제트',
+    type: '별 생성 유출류',
     cost: { type: 'hydrogen', amount: 15000 },
     successRate: 0.75,
     sellPrice: 25000,
     protectionCost: 1,
     drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
-    codexDescription: '【질량: 태양의 약 25배 (볼프-레이에 별 기준)】 독수리자리 8,000광년 거리의 쌍성계. 두 별이 220일 주기로 공전하며 풍차 모양의 나선 성운을 만든다. 감마선 폭발 후보로, 그 방향이 지구를 향하고 있어 주목받는다.',
+    codexDescription: '【발견: 1940~50년대, 허빅과 하로】 원시별에서 뿜어져 나온 물질이 초속 수백 km로 주변 가스와 충돌하며 빛나는 충격파 구조. 원시별 양극에서 대칭적인 제트 형태로 뻗어나가는 모습이 특징이다.',
   },
   {
     level: 8,
-    name: '베텔게우스',
-    subname: 'α Orionis',
-    type: '적색초거성',
+    name: '전주계열성',
+    subname: 'FS 타우리',
+    type: 'T타우리형 별',
     cost: { type: 'hydrogen', amount: 22000 },
     successRate: 0.70,
     sellPrice: 50000,
     protectionCost: 1,
     drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
-    codexDescription: '【질량: 태양의 약 16~19배 / 반지름: 태양의 약 700배】 오리온자리의 적색초거성. 이 별이 태양 자리에 있다면 목성 궤도까지 뒤덮는다. 700광년 거리에 있으며 수만 년 안에 초신성 폭발이 예상된다.',
+    codexDescription: '【거리: 약 450광년】 황소자리 별 생성 지역의 젊은 T타우리형 별. 아직 중심에서 안정적인 수소 핵융합이 시작되지 않은 채, 중력 수축으로 발생하는 열로만 빛을 낸다.',
   },
   {
     level: 9,
-    name: 'UY 방패자리',
-    subname: 'UY Scuti',
-    type: '극초거성',
+    name: 'FU 오리온 폭발',
+    subname: '강착 폭발',
+    type: '강착 폭발 현상',
     cost: { type: 'hydrogen', amount: 30000 },
     successRate: 0.66,
     sellPrice: 90000,
     protectionCost: 1,
-    drop: { key: ITEM_KEYS.HYPERGIANT_CORE, min: 1, max: 2 },
-    codexDescription: '【질량: 태양의 약 7~10배 / 반지름: 태양의 약 1,700배】 현재까지 알려진 가장 큰 별 중 하나. 9,500광년 거리에 위치하며 부피로는 태양의 50억 배. 질량은 크기에 비해 작은 편으로 극도로 팽창한 불안정한 상태다.',
+    drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+    codexDescription: '【밝기 변화: 수개월 만에 약 100배 폭증】 주변 원반에서 쏟아지는 물질 강착률이 갑자기 치솟으며 별이 폭발적으로 밝아지는 현상. FU 오리온형 폭발은 이후 수십 년에 걸쳐 서서히 가라앉는다.',
   },
   {
     level: 10,
-    name: 'SN 1987A',
-    subname: '대마젤란 은하 초신성',
-    type: 'II형 초신성',
+    name: '영년 주계열',
+    subname: '플레이아데스 성단 · M45',
+    type: '영년 주계열성',
     cost: { type: 'hydrogen', amount: 30000 },
     successRate: 0.62,
     sellPrice: 180000,
     protectionCost: 1,
-    drop: { key: ITEM_KEYS.SUPERNOVA_GLOW, min: 1, max: 2 },
-    codexDescription: '【폭발 전 질량: 태양의 약 20배 / 폭발 에너지: 약 10⁴⁴ J】 168,000광년 거리의 대마젤란 은하에서 1987년 2월 관측된 초신성. 맨눈으로 보일 정도로 밝았다. 뉴트리노 폭풍이 지구에서 검출되어 초신성 이론을 최초로 실험적으로 검증했다.',
+    drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+    codexDescription: '【나이: 약 1억 년 / 거리: 약 444광년】 안정적인 수소 핵융합을 막 시작한 갓 태어난 주계열성 단계. 플레이아데스 성단은 이런 젊은 별들이 모여 있는 대표적인 산개성단이다.',
   },
   {
     level: 11,
-    name: '게 성운',
-    subname: 'M1 · SN 1054 잔해',
-    type: '초신성 잔해',
+    name: '주계열성',
+    subname: '태양',
+    type: '주계열성',
     cost: { type: 'hydrogen', amount: 51000 },
     successRate: 0.61,
     sellPrice: 500000,
     protectionCost: 1,
-    drop: { key: ITEM_KEYS.NEUTRON_CRUST, min: 1, max: 2 },
-    codexDescription: '【크기: 직경 약 11광년 / 팽창 속도: 초속 약 1,500km】 1054년 초신성 폭발의 잔해. 6,523광년 거리. 질량은 태양의 약 4.6배이며 중심에는 게 펄사가 있다. X선부터 전파까지 폭넓게 방출한다.',
+    drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+    codexDescription: '【나이: 약 46억 년 / 예상 수명: 약 100억 년】 중심핵에서 수소를 헬륨으로 융합하며 안정적으로 빛나는 별의 전형적인 단계. 태양은 현재 이 주계열 수명의 절반 정도를 지나고 있다.',
   },
   {
     level: 12,
-    name: 'PSR B1919+21',
-    subname: '최초 발견 펄사',
-    type: '중성자별',
+    name: '주계열 성숙기',
+    subname: '흑점 · 플레어',
+    type: '자기 활동기',
     cost: { type: 'hydrogen', amount: 70000 },
     successRate: 0.54,
     sellPrice: 1000000,
     protectionCost: 1,
-    drop: { key: ITEM_KEYS.NEUTRON_CRUST, min: 1, max: 2 },
-    codexDescription: '【직경: 약 20km / 질량: 태양의 약 1.4배】 1967년 조슬린 벨이 발견한 인류 최초의 펄사. 처음에는 규칙적인 전파 신호에 \'LGM-1\'(작은 녹색인간)이라는 별명이 붙었다. 중성자별이 회전하며 방출하는 전파 빔임이 밝혀졌다.',
+    drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+    codexDescription: '【태양 흑점 주기: 약 11년】 내부 구조가 서서히 변하며 자기 활동이 두드러지는 시기. 흑점, 플레어, 코로나 물질 방출이 점점 더 격렬해진다.',
   },
   {
     level: 13,
-    name: '게 펄사',
-    subname: 'PSR B0531+21',
-    type: '펄사',
+    name: '중심 수소 고갈',
+    subname: '맥동 거성 · ξ Hya',
+    type: '핵연료 고갈기',
     cost: { type: 'hydrogen', amount: 80000 },
     successRate: 0.50,
     sellPrice: 2000000,
     protectionCost: 2,
-    drop: { key: ITEM_KEYS.PULSAR_SIGNAL, min: 1, max: 2 },
-    codexDescription: '【직경: 약 28km / 질량: 태양의 약 1.4배】 게 성운 중심의 중성자별. 초당 30회 회전하며 강력한 전파와 X선을 방출한다. 이 초밀도 천체의 표면 중력은 지구의 2천억 배에 달한다.',
+    drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+    codexDescription: '【거리: 약 130광년】 중심핵의 수소가 바닥나면서 융합이 핵 주변 껍질로 옮겨가고 별이 부풀기 시작하는 단계. ξ Hya 같은 맥동 거성은 이 시기의 밝기 변화를 통해 항성지진학 연구에 활용된다.',
   },
   {
     level: 14,
-    name: 'SGR 1806-20',
-    subname: '마그네타',
-    type: '마그네타',
+    name: '준거성',
+    subname: '프로키온 급',
+    type: '준거성',
     cost: { type: 'hydrogen', amount: 100000 },
     successRate: 0.49,
     sellPrice: 5000000,
     protectionCost: 3,
-    drop: { key: ITEM_KEYS.MAGNETAR_FLARE, min: 1, max: 2 },
-    codexDescription: '【직경: 약 20km / 자기장: 약 10¹⁵ 가우스 (지구의 10조 배)】 궁수자리 방향 50,000광년 거리의 마그네타. 2004년 12월 27일 0.2초 동안 태양이 10만 년간 방출하는 에너지를 폭발시켰다. 이 섬광은 지구 전리층을 일시적으로 교란시켰다.',
+    drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+    codexDescription: '【거리: 약 11.5광년】 핵은 수축하고 겉껍질은 팽창하며 서서히 식어가는 과도기적 단계. 프로키온은 태양계에서 가장 가까운 준거성 중 하나로 꼽힌다.',
   },
   {
     level: 15,
-    name: '백조자리 X-1',
-    subname: 'Cygnus X-1',
-    type: '항성질량 블랙홀',
+    name: '적색거성가지 진입',
+    subname: '알데바란 급',
+    type: '적색거성가지 진입',
     cost: { type: 'hydrogen', amount: 130000 },
     successRate: 0.46,
     sellPrice: 10000000,
     protectionCost: 4,
-    drop: { key: ITEM_KEYS.HAWKING, min: 1, max: 2 },
-    codexDescription: '【질량: 태양의 약 21배 / 슈바르츠실트 반지름: 약 62km】 인류 최초로 확인된 블랙홀 후보. 약 6,100광년 거리에서 동반성의 물질을 빨아들이며 강렬한 X선을 방출한다. 스티븐 호킹이 킵 손과 이 천체를 놓고 내기를 했으며, 호킹이 졌다.',
+    drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+    codexDescription: '【거리: 약 65광년 / 반지름: 태양의 약 44배】 별이 본격적으로 부풀어 오르며 표면 온도가 낮아져 붉은빛을 띠기 시작하는 단계. 알데바란은 이 적색거성가지의 대표적인 예다.',
   },
   {
     level: 16,
-    name: 'HLX-1',
-    subname: 'ESO 243-49 HLX-1',
-    type: '중간질량 블랙홀',
+    name: '운명의 갈림길',
+    subname: 'H-R도 분기점',
+    type: '진화 분기점',
     cost: { type: 'hydrogen', amount: 170000 },
     successRate: 0.44,
     sellPrice: 20000000,
     protectionCost: 7,
     drop: { key: ITEM_KEYS.DARK_MATTER, min: 1, max: 2 },
-    codexDescription: '【질량: 태양의 약 20,000배 / 슈바르츠실트 반지름: 약 0.2 AU】 2.9억 광년 거리 은하에서 발견된 중간질량 블랙홀 최유력 후보. 항성질량과 초대질량 블랙홀 사이의 미싱 링크로 주목받는 천체다.',
-  },
-  {
-    level: 17,
-    name: 'M87*',
-    subname: '버질 · 처녀자리 A',
-    type: '초대질량 블랙홀',
-    cost: { type: 'hydrogen', amount: 220000 },
-    successRate: 0.40,
-    sellPrice: 44500000,
-    protectionCost: 9,
-    drop: null,
-    codexDescription: '【질량: 태양의 약 65억 배 / 사건 지평선 직경: 약 400억 km (명왕성 궤도의 3배)】 5,500만 광년 거리 M87 은하 중심의 블랙홀. 2019년 4월 10일, 사건 지평선 망원경(EHT)이 인류 최초로 블랙홀의 실제 이미지를 촬영하는 데 성공했다.',
-  },
-  {
-    level: 18,
-    name: '궁수자리 A*',
-    subname: 'Sgr A*',
-    type: '우리 은하 중심 블랙홀',
-    cost: { type: 'hydrogen', amount: 300000 },
-    successRate: 0.38,
-    sellPrice: 72000000,
-    protectionCost: 10,
-    drop: null,
-    codexDescription: '【질량: 태양의 약 400만 배 / 사건 지평선 직경: 약 2,400만 km】 우리 은하 중심의 초대질량 블랙홀. 2022년 EHT가 두 번째 블랙홀 사진으로 공개했다. 지구에서 약 26,000광년 거리에 있으며 은하 전체 별들의 공전 중심이다.',
-  },
-  {
-    level: 19,
-    name: 'TON 618',
-    subname: '사냥개자리 블랙홀',
-    type: '은하질량 블랙홀',
-    cost: { type: 'hydrogen', amount: 400000 },
-    successRate: 0.35,
-    sellPrice: 120000000,
-    protectionCost: 12,
-    drop: null,
-    codexDescription: '【질량: 태양의 약 660억 배 / 사건 지평선 직경: 약 1,300 AU (명왕성 궤도의 43배)】 104억 광년 거리에 위치한 초대질량 블랙홀. 현재까지 알려진 가장 무거운 블랙홀 중 하나로, 블랙홀 자체의 크기가 태양계 전체를 압도한다.',
-  },
-  {
-    level: 20,
-    name: '켄타우루스 A',
-    subname: 'NGC 5128',
-    type: '활동은하핵 (AGN)',
-    cost: { type: 'hydrogen', amount: 650000 },
-    successRate: 0.33,
-    sellPrice: 240000000,
-    protectionCost: 15,
-    drop: null,
-    codexDescription: '【은하 직경: 약 60,000광년 / 중심 블랙홀 질량: 태양의 약 5,500만 배】 1,300만 광년 거리로 지구에서 가장 가까운 전파 은하. 중심 블랙홀이 강력한 제트를 뿜어내며 양쪽으로 수만 광년 뻗어있다. 가시광·전파·X선 등 다양한 파장으로 관측된다.',
-  },
-  {
-    level: 21,
-    name: '3C 273',
-    subname: '처녀자리 퀘이사',
-    type: '퀘이사',
-    cost: { type: 'star', level: 20, amount: 1 },  // 켄타우루스 A 별 1개
-    successRate: 0.30,
-    sellPrice: 300000000,
-    protectionCost: 17,
-    drop: null,
-    codexDescription: '【중심 블랙홀 질량: 태양의 약 9억 배 / 광도: 태양의 약 4조 배】 24억 광년 거리의 가장 밝은 퀘이사. 1963년 최초로 확인된 퀘이사 중 하나로, 맨눈 한계에 가까울 정도로 밝다. 제트 길이가 수십만 광년에 달한다.',
-  },
-  {
-    level: 22,
-    name: 'GRB 221009A',
-    subname: 'BOAT · 화살자리',
-    type: '감마선 폭발체',
-    cost: { type: 'star', level: 21, amount: 2 },  // 3C 273 별 2개
-    successRate: 0.27,
-    sellPrice: 400000000,
-    protectionCost: 20,
-    drop: null,
-    codexDescription: '【에너지: 약 10⁵⁴ 에르그 (태양 전 수명 에너지의 수천 배) / 거리: 약 24억 광년】 2022년 10월 9일 관측된 사상 최강의 감마선 폭발. \'BOAT\'(Brightest Of All Time). 지구 전리층을 교란시켰으며 이런 규모의 폭발은 1만 년에 한 번꼴이다.',
-  },
-  {
-    level: 23,
-    name: '허큘리스-북쪽왕관 장성',
-    subname: 'Hercules–Corona Borealis Great Wall',
-    type: '우주 거대구조',
-    cost: { type: 'item', key: ITEM_KEYS.MAGNETAR_FLARE, amount: 12 },
-    successRate: 0.27,
-    sellPrice: 550000000,
-    protectionCost: 22,
-    drop: null,
-    codexDescription: '【크기: 약 100억 광년 (관측 가능한 우주의 약 10분의 1)】 현재까지 발견된 우주에서 가장 큰 구조물. 은하들이 필라멘트 형태로 연결되어 있으며 이 크기는 우주가 균질하다는 원리를 정면으로 도전한다.',
-  },
-  {
-    level: 24,
-    name: '쌍어자리 초공동',
-    subname: 'Gemini Supervoid',
-    type: '우주 거대 공동',
-    cost: { type: 'star', level: 22, amount: 1 },  // GRB 221009A 별 1개
-    successRate: 0.25,
-    sellPrice: 750000000,
-    protectionCost: 23,
-    drop: null,
-    codexDescription: '【크기: 직경 약 3억 광년】 우주에서 발견된 거대한 빈 공간. 은하가 거의 존재하지 않는 텅 빈 공간으로, 우주 거대 구조의 거품 내부에 해당한다. 암흑 에너지의 영향으로 형성된 것으로 추정된다.',
-  },
-  {
-    level: 25,
-    name: '관측 가능한 우주',
-    subname: 'Observable Universe',
-    type: '우주 전체 구조',
-    cost: { type: 'item', key: ITEM_KEYS.HAWKING, amount: 15 },
-    successRate: 0.35,
-    sellPrice: 400000000,
-    protectionCost: 23,
-    drop: null,
-    codexDescription: '【크기: 반지름 약 465억 광년 / 포함 은하 수: 약 2조 개】 지구에서 관측 가능한 우주의 전체 범위. 빅뱅 이후 138억 년간 팽창한 우주의 관측 한계로, 그 너머에도 우주는 무한히 계속될 것으로 추정된다.',
-  },
-  {
-    level: 26,
-    name: '우주 급팽창 시대',
-    subname: 'Cosmic Inflation',
-    type: '인플레이션 에포크',
-    cost: { type: 'hydrogen', amount: 5000000 },
-    successRate: 0.50,
-    sellPrice: 1800000000,
-    protectionCost: -1,  // 방지권 불가
-    drop: null,
-    codexDescription: '【팽창 규모: 10⁻³⁵초 동안 우주 크기가 약 10⁷⁸배 이상 증가 / 시기: 빅뱅 후 10⁻³⁶~10⁻³²초】 이 시기에 양자 요동이 은하와 거대 구조의 씨앗이 되었다. 인플레이션 이론은 우주의 균질성과 평탄성을 설명하는 현대 우주론의 핵심이다.',
-  },
-  {
-    level: 27,
-    name: '우주 마이크로파 배경',
-    subname: 'CMB · 재결합 시대',
-    type: '우주 재결합 시대',
-    cost: { type: 'item', key: ITEM_KEYS.DARK_MATTER, amount: 2 },
-    successRate: 0.40,
-    sellPrice: 2500000000,
-    protectionCost: -1,
-    drop: null,
-    codexDescription: '【온도: 2.725K (-270.4°C) / 방출 시기: 빅뱅 약 38만 년 후】 우주가 투명해진 시기의 빛이 현재 우주 전체를 극초단파로 가득 채우고 있다. 초기 우주의 미세한 온도 요동이 CMB 지도에 새겨져 있어 우주 탄생의 \'화석\'이라 불린다.',
-  },
-  {
-    level: 28,
-    name: '우주 특이점',
-    subname: '플랑크 시대',
-    type: '빅뱅 직전',
-    cost: { type: 'hydrogen', amount: 0 },  // 무료
-    successRate: 0.15,
-    sellPrice: null,  // 판매 불가
-    protectionCost: -1,
-    drop: null,
-    codexDescription: '【밀도: 플랑크 밀도 약 5×10⁹⁶ kg/m³ (무한대로 수렴) / 크기: 플랑크 길이 1.6×10⁻³⁵m 이하】 모든 물질, 에너지, 공간, 시간이 하나의 점에 압축된 상태. 현재 물리학으로는 설명 불가능한 영역이며 이 특이점에서 시간과 공간이 탄생했다.',
-  },
-  {
-    level: 29,
-    name: '빅뱅',
-    subname: 'The Big Bang · 우주의 탄생',
-    type: '우주의 시작',
-    cost: null,  // 강화 불가 — 전설 달성
-    successRate: null,
-    sellPrice: null,
-    protectionCost: null,
-    drop: null,
-    codexDescription: '【시기: 약 138억 년 전 / 현재 우주 크기: 반지름 약 465억 광년】 극도로 뜨겁고 밀도 높은 상태에서 우주가 탄생한 사건. 모든 물질, 에너지, 공간, 시간의 시작점이다. 이후 우주는 계속 팽창하고 냉각되어 오늘날의 별, 은하, 그리고 우리를 만들어냈다.',
+    codexDescription: '【H-R도(헤르츠스프룽-러셀도) 상의 분기점】 여기서부터 별의 최초 질량이 그 운명을 가른다 — 조용히 식어가는 왜성이 될지, 초신성으로 폭발해 중성자별이나 블랙홀을 남길지. 다음 강화에서 하나의 트랙이 무작위로 정해진다.',
   },
 ];
 
 // ============================================================
-// 상점 아이템 (하드 모드 가격)
+// 트랙 메타 정보
+// ============================================================
+const TRACK_INFO = {
+  track1: { name: '적색왜성 트랙', subname: '저질량 별' },
+  track2: { name: '태양형 별 트랙', subname: '태양급 질량' },
+  track3: { name: '대질량 별 트랙', subname: '초신성 · 중성자별' },
+  track4: { name: '초대질량 별 트랙', subname: '볼프-레이에 · 블랙홀' },
+  track5: { name: '극초대질량 별 트랙', subname: '퀘이사 · 초대질량 블랙홀' },
+};
+
+// ============================================================
+// 트랙별 단계 (+17 ~ +24) — level 16→17 강화 성공 시 무작위 배정
+// 5개 트랙 모두 동일한 난이도 곡선을 공유해 트랙 간 공정성을 맞춘다.
+// cost.level (type:'star')은 "같은 트랙"의 해당 레벨을 가리킨다.
+// ============================================================
+const TRACKS = {
+  track1: [
+    { level: 17, name: '적색왜성', subname: '프록시마 센타우리', type: 'M형 적색왜성',
+      cost: { type: 'hydrogen', amount: 220000 }, successRate: 0.40, sellPrice: 44500000, protectionCost: 9,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【거리: 4.24광년 / 질량: 태양의 약 12%】 태양계에서 가장 가까운 항성. 표면온도 약 3,000K의 M형 적색왜성으로, 연료를 극도로 아껴 쓰기 시작하는 첫 단계다.' },
+    { level: 18, name: '플레어별', subname: 'TRAPPIST-1 급', type: '활동성 적색왜성',
+      cost: { type: 'hydrogen', amount: 300000 }, successRate: 0.38, sellPrice: 72000000, protectionCost: 10,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【거리(TRAPPIST-1): 약 40광년】 강력한 항성 플레어를 자주 일으키는 활동성 적색왜성. TRAPPIST-1은 지구형 행성 7개를 거느린 것으로 유명하다.' },
+    { level: 19, name: '초장수명 주계열', subname: '붉은 왜성', type: '초장수명 주계열성',
+      cost: { type: 'hydrogen', amount: 400000 }, successRate: 0.35, sellPrice: 120000000, protectionCost: 12,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【예상 수명: 수조 년】 연료를 극도로 천천히 소모해 우주 나이(138억 년)로는 단 하나도 아직 주계열을 벗어나지 못했다는 이론적 사실이 성립하는 단계다.' },
+    { level: 20, name: '청색왜성化', subname: '수축·청색화', type: '이론적 진화 단계',
+      cost: { type: 'hydrogen', amount: 650000 }, successRate: 0.33, sellPrice: 240000000, protectionCost: 15,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【순수 이론 단계】 먼 미래 연료가 바닥나기 시작하면, 적색왜성은 부풀지 않고 오히려 수축하며 표면온도가 올라가 푸르게 변할 것이라는 가설상의 과정이다.' },
+    { level: 21, name: '청색왜성', subname: '이론상 말기', type: '이론적 천체',
+      cost: { type: 'star', level: 20, amount: 1 }, successRate: 0.30, sellPrice: 300000000, protectionCost: 17,
+      drop: null,
+      codexDescription: '【관측된 적 없음】 우주 나이가 충분히 길어지면 적색왜성이 최종적으로 도달할 것으로 예측되는, 작고 뜨거운 가상의 상태다.' },
+    { level: 22, name: '헬륨 백색왜성', subname: '시리우스 B 급', type: '백색왜성',
+      cost: { type: 'item', key: ITEM_KEYS.STELLAR_WIND, amount: 10 }, successRate: 0.27, sellPrice: 400000000, protectionCost: 20,
+      drop: null,
+      codexDescription: '【시리우스 B 반지름: 지구와 비슷】 청색왜성 단계 이후 남은 헬륨 핵이 식어가며 만들어지는 백색왜성. 시리우스 B는 실제로는 더 무거운 별의 잔해지만 백색왜성의 대표 예시로 널리 쓰인다.' },
+    { level: 23, name: '백색왜성 냉각', subname: '식어가는 잔해', type: '냉각 백색왜성',
+      cost: { type: 'star', level: 22, amount: 1 }, successRate: 0.24, sellPrice: 550000000, protectionCost: 22,
+      drop: null,
+      codexDescription: '【냉각 기간: 수십억~수조 년】 더 이상 핵융합을 하지 않는 백색왜성이 아주 서서히 식어가는 과정. 표면온도가 낮아질수록 빛깔도 희미해진다.' },
+    { level: 24, name: '흑색왜성', subname: '완전 소등 · 이론상', type: '이론적 최종 잔해',
+      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
+      codexDescription: '【우주에 아직 하나도 존재하지 않음】 백색왜성이 완전히 식어 빛을 잃은 상태. 우주가 아직 그만큼 늙지 않아 실제로는 이론상으로만 존재하는, 저질량 별 진화의 최종 종착지다.' },
+  ],
+  track2: [
+    { level: 17, name: '적색거성', subname: '알데바란', type: '적색거성',
+      cost: { type: 'hydrogen', amount: 220000 }, successRate: 0.40, sellPrice: 44500000, protectionCost: 9,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【거리: 약 65광년 / 반지름: 태양의 약 44배】 중심 수소를 다 태운 태양형 별이 크게 부풀어 오르는 단계. 알데바란은 황소자리의 대표적인 적색거성이다.' },
+    { level: 18, name: '헬륨 섬광', subname: '적색거성 핵', type: '헬륨 점화',
+      cost: { type: 'hydrogen', amount: 300000 }, successRate: 0.38, sellPrice: 72000000, protectionCost: 10,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【점화 시간: 단 몇 초】 축퇴된 헬륨 핵이 임계온도에 도달하면 폭발적으로 헬륨 핵융합이 시작되는 현상. 겉으로는 별의 밝기가 거의 변하지 않는다.' },
+    { level: 19, name: '수평가지', subname: '구상성단 별들', type: '헬륨 안정 연소기',
+      cost: { type: 'hydrogen', amount: 400000 }, successRate: 0.35, sellPrice: 120000000, protectionCost: 12,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【H-R도 상 특징】 헬륨 섬광 이후 별이 안정적으로 헬륨을 태우는 단계. 구상성단의 H-R도에서 수평으로 늘어선 별들의 띠로 뚜렷하게 관측된다.' },
+    { level: 20, name: '점근거성가지', subname: '맥동 AGB별 · R Scl', type: 'AGB 별',
+      cost: { type: 'hydrogen', amount: 650000 }, successRate: 0.33, sellPrice: 240000000, protectionCost: 15,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【R 조각가자리 껍질 구조】 헬륨마저 고갈되면 다시 팽창하며 맥동하는 거대한 별이 된다. R 조각가자리는 강한 물질 방출로 만들어진 동심원 껍질 구조가 관측된 AGB별이다.' },
+    { level: 21, name: '후-AGB 초바람', subname: '알 성운 · Egg', type: '초바람 방출기',
+      cost: { type: 'star', level: 20, amount: 1 }, successRate: 0.30, sellPrice: 300000000, protectionCost: 17,
+      drop: null,
+      codexDescription: '【방출 속도: 초속 수백 km】 AGB 단계 말기, 강력한 항성풍으로 외곽 물질을 대량으로 방출한다. Egg 성운은 이 과정에서 만들어지는 대칭적인 먼지 껍질을 잘 보여준다.' },
+    { level: 22, name: '행성상성운', subname: '나선성운 · Helix', type: '행성상성운',
+      cost: { type: 'item', key: ITEM_KEYS.STELLAR_WIND, amount: 10 }, successRate: 0.27, sellPrice: 400000000, protectionCost: 20,
+      drop: null,
+      codexDescription: '【거리: 약 650광년】 방출된 가스 껍질이 뜨거운 잔해핵의 자외선에 빛나며 만드는 성운. 나선성운(Helix Nebula)은 가장 가까운 행성상성운 중 하나로 꼽힌다.' },
+    { level: 23, name: '백색왜성', subname: 'NGC 2440 중심별', type: '고온 백색왜성',
+      cost: { type: 'star', level: 22, amount: 1 }, successRate: 0.24, sellPrice: 550000000, protectionCost: 22,
+      drop: null,
+      codexDescription: '【표면온도: 약 20만K】 행성상성운 중심에 남는 뜨겁고 조밀한 잔해. NGC 2440의 중심별은 알려진 백색왜성 중 가장 뜨거운 축에 속한다.' },
+    { level: 24, name: '흑색왜성', subname: '완전 소등 · 이론상', type: '이론적 최종 잔해',
+      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
+      codexDescription: '【우주에 아직 하나도 존재하지 않음】 태양형 별의 백색왜성 잔해 역시 극한의 시간 뒤에는 빛을 잃은 흑색왜성이 될 것으로 예측되는 진화의 최종 종착지다.' },
+  ],
+  track3: [
+    { level: 17, name: '청색초거성', subname: '리겔', type: '청색초거성',
+      cost: { type: 'hydrogen', amount: 220000 }, successRate: 0.40, sellPrice: 44500000, protectionCost: 9,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【질량: 태양의 약 21배 / 반지름: 태양의 약 78배】 오리온자리의 청색초거성. 863광년 거리에서 태양보다 120,000배 밝게 빛난다. 수명이 수백만 년에 불과하며 언젠가 초신성으로 폭발해 중성자별이나 블랙홀이 될 것이다.' },
+    { level: 18, name: '적색초거성', subname: '베텔게우스', type: '적색초거성',
+      cost: { type: 'hydrogen', amount: 300000 }, successRate: 0.38, sellPrice: 72000000, protectionCost: 10,
+      drop: { key: ITEM_KEYS.SUPERNOVA_GLOW, min: 1, max: 2 },
+      codexDescription: '【질량: 태양의 약 16~19배 / 반지름: 태양의 약 700배】 오리온자리의 적색초거성. 이 별이 태양 자리에 있다면 목성 궤도까지 뒤덮는다. 700광년 거리에 있으며 수만 년 안에 초신성 폭발이 예상된다.' },
+    { level: 19, name: '규소 연소', subname: '양파껍질 구조', type: '핵연소 최종기',
+      cost: { type: 'hydrogen', amount: 400000 }, successRate: 0.35, sellPrice: 120000000, protectionCost: 12,
+      drop: { key: ITEM_KEYS.NEUTRON_CRUST, min: 1, max: 2 },
+      codexDescription: '【진행 기간: 폭발 직전 단 며칠】 중심핵에서 규소가 철로 융합되며 별 내부가 양파처럼 겹겹의 원소 층을 이루는 붕괴 직전 최종 단계다.' },
+    { level: 20, name: '철핵 붕괴', subname: '1초의 붕괴', type: '중력붕괴',
+      cost: { type: 'hydrogen', amount: 650000 }, successRate: 0.33, sellPrice: 240000000, protectionCost: 15,
+      drop: { key: ITEM_KEYS.PULSAR_SIGNAL, min: 1, max: 2 },
+      codexDescription: '【붕괴 소요시간: 약 1초】 철은 더 이상 에너지를 낼 수 없어 핵융합이 멈추고, 중심핵이 단 1초 만에 중력붕괴하며 초신성 폭발의 방아쇠를 당긴다.' },
+    { level: 21, name: 'II형 초신성', subname: 'SN 1987A', type: 'II형 초신성',
+      cost: { type: 'star', level: 20, amount: 1 }, successRate: 0.30, sellPrice: 300000000, protectionCost: 17,
+      drop: null,
+      codexDescription: '【폭발 전 질량: 태양의 약 20배 / 폭발 에너지: 약 10⁴⁴ J】 168,000광년 거리의 대마젤란 은하에서 1987년 관측된 초신성. 뉴트리노 폭풍이 지구에서 검출되어 초신성 이론을 최초로 실험적으로 검증했다.' },
+    { level: 22, name: '초신성 잔해', subname: '게 성운 · M1', type: '초신성 잔해',
+      cost: { type: 'item', key: ITEM_KEYS.NEUTRON_CRUST, amount: 6 }, successRate: 0.27, sellPrice: 400000000, protectionCost: 20,
+      drop: null,
+      codexDescription: '【크기: 직경 약 11광년】 1054년 초신성 폭발의 잔해. 6,523광년 거리. 중심에는 게 펄사가 있으며 X선부터 전파까지 폭넓게 방출한다.' },
+    { level: 23, name: '중성자별', subname: 'PSR B1919+21', type: '중성자별',
+      cost: { type: 'star', level: 22, amount: 1 }, successRate: 0.24, sellPrice: 550000000, protectionCost: 22,
+      drop: null,
+      codexDescription: '【직경: 약 20km / 질량: 태양의 약 1.4배】 1967년 조슬린 벨이 발견한 인류 최초의 펄사. 중성자별이 회전하며 방출하는 전파 빔임이 밝혀졌다.' },
+    { level: 24, name: '펄사', subname: '게 펄사 · PSR B0531+21', type: '펄사',
+      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
+      codexDescription: '【직경: 약 28km / 회전주기: 초당 30회】 게 성운 중심의 중성자별. 표면 중력이 지구의 2천억 배에 달하는, 대질량 별 진화의 최종 종착지다.' },
+  ],
+  track4: [
+    { level: 17, name: 'O형 초거성', subname: '제타 퍼페이', type: 'O형 초거성',
+      cost: { type: 'hydrogen', amount: 220000 }, successRate: 0.40, sellPrice: 44500000, protectionCost: 9,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【질량: 태양의 약 20배 / 반지름: 태양의 약 14배】 돛자리의 O형 초고온 청색 별. 표면 온도 약 42,000K로 태양보다 250,000배 밝다. 강렬한 항성풍으로 초당 수백만 톤의 물질을 날려보낸다.' },
+    { level: 18, name: '밝은청색변광성', subname: '에타 카리나', type: '광도변광성 (LBV)',
+      cost: { type: 'hydrogen', amount: 300000 }, successRate: 0.38, sellPrice: 72000000, protectionCost: 10,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【질량: 태양의 약 100~150배 / 반지름: 태양의 약 240배】 7,500광년 거리의 불안정한 극거성. 1840년대 대폭발로 태양의 수백만 배 에너지를 방출했다.' },
+    { level: 19, name: 'LBV 대폭발', subname: '호문쿨루스 성운', type: 'LBV 대분출',
+      cost: { type: 'hydrogen', amount: 400000 }, successRate: 0.35, sellPrice: 120000000, protectionCost: 12,
+      drop: { key: ITEM_KEYS.MAGNETAR_FLARE, min: 1, max: 2 },
+      codexDescription: '【방출 질량: 태양의 약 10~20배】 에타 카리나의 1840년대 대분출로 만들어진 쌍극성 성운 호문쿨루스. 짧은 기간에 엄청난 양의 물질이 우주로 흩뿌려졌다.' },
+    { level: 20, name: '볼프-레이에 별', subname: 'WR 104', type: '볼프-레이에 별',
+      cost: { type: 'hydrogen', amount: 650000 }, successRate: 0.33, sellPrice: 240000000, protectionCost: 15,
+      drop: { key: ITEM_KEYS.HYPERGIANT_CORE, min: 1, max: 2 },
+      codexDescription: '【거리: 약 8,000광년】 독수리자리의 쌍성계. 두 별이 220일 주기로 공전하며 풍차 모양의 나선 성운을 만든다. 감마선 폭발 후보로 주목받는다.' },
+    { level: 21, name: '극초신성 / GRB', subname: '감마선 폭발체', type: '극초신성',
+      cost: { type: 'star', level: 20, amount: 1 }, successRate: 0.30, sellPrice: 300000000, protectionCost: 17,
+      drop: null,
+      codexDescription: '【제트 속도: 광속에 근접】 초대질량 별의 핵붕괴가 상대론적 제트를 만들어내며 극도로 강력한 감마선 폭발(GRB)을 일으키는 극단적인 초신성이다.' },
+    { level: 22, name: '블랙홀 형성', subname: '강착원반 · 제트', type: '블랙홀 탄생',
+      cost: { type: 'item', key: ITEM_KEYS.HYPERGIANT_CORE, amount: 6 }, successRate: 0.27, sellPrice: 400000000, protectionCost: 20,
+      drop: null,
+      codexDescription: '【사건지평선 형성】 붕괴하는 핵이 사건지평선을 만들고, 남은 물질이 강착원반을 이루며 제트를 뿜어내는 블랙홀 탄생의 순간이다.' },
+    { level: 23, name: '항성질량 블랙홀', subname: '백조자리 X-1', type: '항성질량 블랙홀',
+      cost: { type: 'star', level: 22, amount: 1 }, successRate: 0.24, sellPrice: 550000000, protectionCost: 22,
+      drop: null,
+      codexDescription: '【질량: 태양의 약 21배】 인류 최초로 확인된 블랙홀 후보. 약 6,100광년 거리에서 동반성의 물질을 빨아들이며 강렬한 X선을 방출한다. 스티븐 호킹이 킵 손과 이 천체를 놓고 내기를 했으며, 호킹이 졌다.' },
+    { level: 24, name: 'X선 쌍성 블랙홀', subname: 'MAXI J1348-630', type: 'X선 쌍성 블랙홀',
+      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
+      codexDescription: '【발견: 2019년】 동반성의 물질을 빨아들이며 강력한 제트와 X선을 방출하는 활동적인 블랙홀 쌍성계. 초대질량 별 진화의 최종 종착지다.' },
+  ],
+  track5: [
+    { level: 17, name: '극초거성', subname: 'UY 방패자리', type: '극초거성',
+      cost: { type: 'hydrogen', amount: 220000 }, successRate: 0.40, sellPrice: 44500000, protectionCost: 9,
+      drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
+      codexDescription: '【질량: 태양의 약 7~10배 / 반지름: 태양의 약 1,700배】 현재까지 알려진 가장 큰 별 중 하나. 9,500광년 거리에 위치하며 부피로는 태양의 50억 배에 달한다.' },
+    { level: 18, name: '극대광도 별', subname: '피스톨 별', type: '극대광도 별',
+      cost: { type: 'hydrogen', amount: 300000 }, successRate: 0.38, sellPrice: 72000000, protectionCost: 10,
+      drop: { key: ITEM_KEYS.HYPERGIANT_CORE, min: 1, max: 2 },
+      codexDescription: '【광도: 태양의 약 340만 배】 은하 중심 근처의 극도로 밝은 별. 강력한 항성풍으로 스스로를 감싸는 피스톨 성운을 만들어냈다.' },
+    { level: 19, name: '種族 III 거대별', subname: 'Population III', type: '1세대 원시별',
+      cost: { type: 'hydrogen', amount: 400000 }, successRate: 0.35, sellPrice: 120000000, protectionCost: 12,
+      drop: { key: ITEM_KEYS.DARK_MATTER, min: 1, max: 2 },
+      codexDescription: '【추정 질량: 태양의 수백 배】 빅뱅 직후 중원소가 없는 원시가스로만 만들어진 우주 최초 세대의 별. 아직 직접 관측된 적은 없는 이론적 존재다.' },
+    { level: 20, name: '쌍불안정', subname: '전자쌍 생성', type: '쌍불안정 현상',
+      cost: { type: 'hydrogen', amount: 650000 }, successRate: 0.33, sellPrice: 240000000, protectionCost: 15,
+      drop: { key: ITEM_KEYS.HAWKING, min: 1, max: 2 },
+      codexDescription: '【임계 온도: 약 10억K 이상】 중심 온도가 너무 높아 감마선이 전자-양전자 쌍으로 변환되며 복사압이 급격히 줄어 별이 불안정해지는 현상이다.' },
+    { level: 21, name: '쌍불안정 초신성', subname: '완전 소멸 폭발', type: '쌍불안정 초신성',
+      cost: { type: 'star', level: 20, amount: 1 }, successRate: 0.30, sellPrice: 300000000, protectionCost: 17,
+      drop: null,
+      codexDescription: '【잔해: 없음】 쌍불안정으로 촉발된 폭발이 별 전체를 남김없이 흩어버려, 블랙홀조차 남기지 않는 극히 드문 유형의 초신성이다.' },
+    { level: 22, name: '초대질량 블랙홀 씨앗', subname: '중간질량 블랙홀', type: '중간질량 블랙홀',
+      cost: { type: 'item', key: ITEM_KEYS.HAWKING, amount: 6 }, successRate: 0.27, sellPrice: 400000000, protectionCost: 20,
+      drop: null,
+      codexDescription: '【질량: 태양의 약 20,000배】 초기 우주에서 극초대질량 별의 붕괴로 만들어졌을 것으로 추정되는 중간질량 블랙홀. 이후 은하 중심 초대질량 블랙홀로 성장하는 씨앗 후보다.' },
+    { level: 23, name: '퀘이사', subname: '3C 273', type: '퀘이사',
+      cost: { type: 'star', level: 22, amount: 1 }, successRate: 0.24, sellPrice: 550000000, protectionCost: 22,
+      drop: null,
+      codexDescription: '【중심 블랙홀 질량: 태양의 약 9억 배 / 광도: 태양의 약 4조 배】 24억 광년 거리의 가장 밝은 퀘이사 중 하나. 1963년 최초로 확인되었으며 맨눈 한계에 가까울 정도로 밝다.' },
+    { level: 24, name: '초대질량 블랙홀', subname: '궁수자리 A*', type: '초대질량 블랙홀',
+      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
+      codexDescription: '【질량: 태양의 약 400만 배】 우리 은하 중심의 초대질량 블랙홀. 2022년 사건지평선망원경(EHT)이 두 번째 블랙홀 사진으로 공개했다. 극초대질량 별 진화의 최종 종착지다.' },
+  ],
+};
+
+/** 레벨(+track)에 해당하는 단계 데이터 반환 — 공통(0~16)은 track 불필요 */
+function resolveStage(level, track) {
+  if (level == null) return null;
+  if (level <= 16) return COMMON_STAGES[level];
+  const t = TRACKS[track];
+  return t ? t[level - 17] : null;
+}
+
+/** storedStars/unlockedCodex에 쓰는 문자열 키 — 공통은 "7", 트랙 구간은 "track3_20" */
+function stageKey(level, track) {
+  return level <= 16 ? String(level) : `${track}_${level}`;
+}
+
+/** stageKey의 역변환 — "track3_20" → {level:20, track:'track3'}, "7" → {level:7, track:null} */
+function parseStageKey(key) {
+  const m = /^(track\d)_(\d+)$/.exec(key);
+  return m ? { level: parseInt(m[2], 10), track: m[1] } : { level: parseInt(key, 10), track: null };
+}
+
+// ============================================================
+// 상점 아이템 (하드 모드 가격) — 도약권은 전부 공통 구간(0~16) 내
 // ============================================================
 const SHOP_ITEMS = [
   {
     id: 'warp_9',
     name: '+9강 도약권',
-    desc: 'UY 방패자리(+9) 상태로 시작합니다.',
+    desc: 'FU 오리온 폭발(+9) 상태로 시작합니다.',
     price: 1000000,
     type: 'warp',
     targetLevel: 9,
@@ -419,7 +472,7 @@ const SHOP_ITEMS = [
   {
     id: 'warp_13',
     name: '+13강 도약권',
-    desc: '게 펄사(+13) 상태로 시작합니다.',
+    desc: '중심 수소 고갈(+13) 상태로 시작합니다.',
     price: 7000000,
     type: 'warp',
     targetLevel: 13,
@@ -427,7 +480,7 @@ const SHOP_ITEMS = [
   {
     id: 'warp_14',
     name: '+14강 도약권',
-    desc: 'SGR 1806-20(+14) 상태로 시작합니다.',
+    desc: '준거성(+14) 상태로 시작합니다.',
     price: 10000000,
     type: 'warp',
     targetLevel: 14,
@@ -435,7 +488,7 @@ const SHOP_ITEMS = [
   {
     id: 'warp_15',
     name: '+15강 도약권',
-    desc: '백조자리 X-1(+15) 상태로 시작합니다.',
+    desc: '적색거성가지 진입(+15) 상태로 시작합니다.',
     price: 15000000,
     type: 'warp',
     targetLevel: 15,
@@ -460,6 +513,10 @@ const SHOP_ITEMS = [
 
 // ============================================================
 // 조합소 레시피 (하드 모드)
+//
+// output.type === 'star'에서 trackRelative가 있으면 "제작자 본인 트랙의
+// N번째 트랙 단계"(level = 17+N)를 뜻한다 — 트랙은 무작위 배정이라
+// 특정 트랙을 직접 지정할 수 없기 때문.
 // ============================================================
 const RECIPES = [
   {
@@ -477,8 +534,8 @@ const RECIPES = [
   {
     id: 'r3',
     inputs: [{ key: ITEM_KEYS.SUPERNOVA_GLOW, amount: 3 }],
-    output: { type: 'star', level: 13 },
-    desc: '초신성 잔광 3개 → 게 펄사(+13) 별 1개',
+    output: { type: 'star', trackRelative: 1 },
+    desc: '초신성 잔광 3개 → 내 트랙 2번째 단계 별 1개',
   },
   {
     id: 'r4',
@@ -489,8 +546,8 @@ const RECIPES = [
   {
     id: 'r5',
     inputs: [{ key: ITEM_KEYS.PULSAR_SIGNAL, amount: 2 }],
-    output: { type: 'star', level: 16 },
-    desc: '펄사 전파 신호 2개 → HLX-1(+16) 별 1개',
+    output: { type: 'star', trackRelative: 3 },
+    desc: '펄사 전파 신호 2개 → 내 트랙 4번째 단계 별 1개',
   },
   {
     id: 'r6',
@@ -501,8 +558,8 @@ const RECIPES = [
   {
     id: 'r7',
     inputs: [{ key: ITEM_KEYS.MAGNETAR_FLARE, amount: 6 }],
-    output: { type: 'star', level: 19 },
-    desc: '마그네타 섬광 6개 → TON 618(+19) 별 1개',
+    output: { type: 'star', trackRelative: 5 },
+    desc: '마그네타 섬광 6개 → 내 트랙 6번째 단계 별 1개',
   },
   {
     id: 'r8',
@@ -518,11 +575,11 @@ const RECIPES = [
   },
 ];
 
-// 절대 조합하면 안 되는 아이템 경고
+// 절대 조합하면 안 되는 아이템 경고 (레시피 r7/r8/r9 재료)
 const IMPORTANT_ITEM_WARNINGS = {
-  [ITEM_KEYS.MAGNETAR_FLARE]: '⚠️ +23강 재료(12개) 필요 — 함부로 교환하지 마세요!',
-  [ITEM_KEYS.HAWKING]:        '⚠️ +25강 재료(15개) 필요 — 함부로 교환하지 마세요!',
-  [ITEM_KEYS.DARK_MATTER]:    '⚠️ +27강 재료(2개) 필요 — 함부로 교환하지 마세요!',
+  [ITEM_KEYS.MAGNETAR_FLARE]: '[경고] 조합 재료(6개) — 함부로 교환하지 마세요!',
+  [ITEM_KEYS.HAWKING]:        '[경고] 조합 재료(6개) — 함부로 교환하지 마세요!',
+  [ITEM_KEYS.DARK_MATTER]:    '[경고] 조합 재료(4개) — 함부로 교환하지 마세요!',
 };
 
 // 레이트리밋 (분당 최대 강화 횟수)

@@ -5,10 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
   <title>별 강화하기</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Sora:wght@700;900&family=Hanken+Grotesk:wght@400;500;700;900&family=Geist:wght@700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- ───────────────── 상단 헤더 ───────────────── -->
+<div class="top-header">
+  <div class="top-header-logo">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L14.4 9.2L22 12L14.4 14.8L12 22L9.6 14.8L2 12L9.6 9.2L12 2Z" fill="black"/>
+    </svg>
+  </div>
+  <div class="top-header-title">별 강화하기</div>
+</div>
 
 <!-- ───────────────── 강화 결과 오버레이 ───────────────── -->
 <div class="result-overlay" id="result-overlay">
@@ -169,7 +179,7 @@ let pendingState = {
 function updateUI(user) {
   currentUser = user;
   const level = user.currentStar || 0;
-  const stage = STAGES[level];
+  const stage = resolveStage(level, user.track);
 
   // 상태 바
   document.getElementById('stat-nickname').textContent = user.nickname;
@@ -183,11 +193,11 @@ function updateUI(user) {
   document.getElementById('star-type-badge').textContent  = stage.type;
 
   const coreEl = document.getElementById('star-core');
-  coreEl.src = `images/star_${level}.png`;
+  coreEl.src = starImagePath(level, user.track);
 
   // 강화 정보
   if (stage.cost === null) {
-    // +29: 전설 달성, 강화 불가
+    // 트랙 최종 단계: 전설 달성, 강화 불가
     document.getElementById('enhance-section').style.display  = 'none';
     document.getElementById('enhance-info-card').style.display = 'none';
     document.getElementById('legend-card').style.display      = '';
@@ -198,9 +208,13 @@ function updateUI(user) {
   document.getElementById('enhance-info-card').style.display = '';
   document.getElementById('legend-card').style.display      = 'none';
 
-  // 다음 단계 이름
-  const nextStage = STAGES[level + 1];
-  document.getElementById('next-star-name').textContent = nextStage ? nextStage.name : '-';
+  // 다음 단계 이름 (16→17은 트랙이 무작위 배정되므로 이름을 미리 알 수 없음)
+  if (level === 16) {
+    document.getElementById('next-star-name').textContent = '??? (무작위 트랙 배정)';
+  } else {
+    const nextStage = resolveStage(level + 1, user.track);
+    document.getElementById('next-star-name').textContent = nextStage ? nextStage.name : '-';
+  }
 
   // 성공 확률
   const rate = Math.round(stage.successRate * 100);
@@ -232,9 +246,9 @@ function updateUI(user) {
     protText.style.color = 'var(--text-sub)';
   }
 
-  // 별 보관 버튼 (19강 이상에서만 보관 가능)
+  // 별 보관 버튼 (트랙 진입, 17강 이상에서만 보관 가능)
   const btnStore = document.getElementById('btn-store');
-  btnStore.style.display = level >= 19 ? '' : 'none';
+  btnStore.style.display = level >= 17 ? '' : 'none';
 
   // 액션 행: 0강=아이템창+상점 / 1강+=조합소+판매
   const btnLeft  = document.getElementById('btn-left');
@@ -274,10 +288,12 @@ function formatCost(cost, user) {
     return `<span style="color:${color}">${ITEM_NAMES[cost.key]} ${cost.amount}개 (보유: ${held})</span>`;
   }
   if (cost.type === 'star') {
-    const stored  = (user.storedStars && user.storedStars[cost.level]) || 0;
+    const key     = stageKey(cost.level, user.track);
+    const stored  = (user.storedStars && user.storedStars[key]) || 0;
     const enough  = stored >= cost.amount;
     const color   = enough ? 'var(--success)' : 'var(--danger)';
-    const name    = STAGES[cost.level] ? STAGES[cost.level].name : `+${cost.level}강 별`;
+    const stage   = resolveStage(cost.level, user.track);
+    const name    = stage ? stage.name : `+${cost.level}강 별`;
     return `<span style="color:${color}">${name} ${cost.amount}개 (보유: ${stored})</span>`;
   }
   return '-';
@@ -288,7 +304,10 @@ function canAffordCost(cost, user) {
   if (!cost) return false;
   if (cost.type === 'hydrogen') return (user.hydrogen || 0) >= cost.amount;
   if (cost.type === 'item')     return ((user.items && user.items[cost.key]) || 0) >= cost.amount;
-  if (cost.type === 'star')     return ((user.storedStars && user.storedStars[cost.level]) || 0) >= cost.amount;
+  if (cost.type === 'star') {
+    const key = stageKey(cost.level, user.track);
+    return ((user.storedStars && user.storedStars[key]) || 0) >= cost.amount;
+  }
   return false;
 }
 
@@ -321,7 +340,7 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
   btn.disabled = true;
 
   const level = currentUser.currentStar;
-  const stage = STAGES[level];
+  const stage = resolveStage(level, currentUser.track);
 
   // 서버 API 호출 (인증 + 판정 + Firebase 쓰기를 서버에서 처리)
   const result = await enhance();
@@ -340,21 +359,27 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
   if (result.success) {
     // 성공: 서버가 currentStar 증가시킴 — 로컬 상태에도 즉시 반영 (재조회 불필요)
     const newLevel = result.level + 1;
-    // 비용을 로컬에서도 차감 (UI 갱신용)
+    // 비용을 로컬에서도 차감 (UI 갱신용) — 차감은 항상 강화 직전 트랙 기준
     if (stage.cost) {
       if (stage.cost.type === 'hydrogen') currentUser.hydrogen = Math.max(0, (currentUser.hydrogen || 0) - stage.cost.amount);
       else if (stage.cost.type === 'item' && currentUser.items) currentUser.items[stage.cost.key] = Math.max(0, (currentUser.items[stage.cost.key] || 0) - stage.cost.amount);
       else if (stage.cost.type === 'star') {
         if (!currentUser.storedStars) currentUser.storedStars = {};
-        currentUser.storedStars[stage.cost.level] = Math.max(0, (currentUser.storedStars[stage.cost.level] || 0) - stage.cost.amount);
+        const costKey = stageKey(stage.cost.level, currentUser.track);
+        currentUser.storedStars[costKey] = Math.max(0, (currentUser.storedStars[costKey] || 0) - stage.cost.amount);
       }
     }
+    if (result.assignedTrack) currentUser.track = result.assignedTrack;
     currentUser.currentStar = newLevel;
     if (newLevel > (currentUser.bestStar || 0)) currentUser.bestStar = newLevel;
+    const unlockKey = stageKey(newLevel, currentUser.track);
     const unlocked = currentUser.unlockedCodex || [];
-    if (!unlocked.includes(newLevel)) currentUser.unlockedCodex = [...unlocked, newLevel];
+    if (!unlocked.includes(unlockKey)) currentUser.unlockedCodex = [...unlocked, unlockKey];
     updateUI(currentUser);
     btn.disabled = false;
+    if (result.assignedTrack) {
+      showToast(`${TRACK_INFO[result.assignedTrack].name}에 진입했습니다!`);
+    }
   } else {
     // 실패: 서버가 pendingFailure 저장. 드랍/방지권 흐름 시작
     pendingState = {
@@ -377,7 +402,7 @@ async function advanceFailureFlow() {
 
   // 방지권 선택 (4강 이상이고 방지 가능한 단계)
   const failedLevel = pendingState.failedLevel;
-  const failedStage = STAGES[failedLevel];
+  const failedStage = resolveStage(failedLevel, currentUser.track);
   const needFallback = failedLevel >= 4; // 0~3강은 하락 없음
   const canProtect = failedStage.protectionCost > 0 && (currentUser.protectionScrolls || 0) >= failedStage.protectionCost;
 
@@ -434,7 +459,7 @@ async function advanceFailureFlow() {
 
 async function handleSell() {
   if (!currentUser) return;
-  const stage = STAGES[currentUser.currentStar];
+  const stage = resolveStage(currentUser.currentStar, currentUser.track);
   if (!stage || !stage.sellPrice) return;
 
   if (!confirm(`+${currentUser.currentStar}강 별(${stage.name})을 ${formatNumber(stage.sellPrice)} 수소에 판매하시겠습니까?`)) return;
@@ -453,9 +478,9 @@ async function handleSell() {
 document.getElementById('btn-store').addEventListener('click', async () => {
   if (!currentUser) return;
   const level = currentUser.currentStar;
-  if (level < 19) return;
+  if (level < 17) return;
 
-  const stage = STAGES[level];
+  const stage = resolveStage(level, currentUser.track);
   if (!confirm(`+${level}강 별(${stage.name})을 보관하시겠습니까?\n보관된 별은 조합소에서 사용할 수 있습니다.`)) return;
 
   const result = await storeStar();

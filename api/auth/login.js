@@ -28,7 +28,21 @@ module.exports = async (req, res) => {
   if (user.banned) {
     return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
   }
-  if (passwordHash !== user.passwordHash) {
+
+  const secretSnap = await db.ref(`authSecrets/${userKey}`).get();
+  let storedHash = secretSnap.exists() ? secretSnap.val().passwordHash : null;
+
+  // 마이그레이션: 과거 스키마(users/$uid.passwordHash, 공개 읽기 경로)에 남아있는
+  // 기존 계정 — 이번 로그인에서 검증되면 authSecrets로 옮기고 공개 경로에서 제거
+  if (!storedHash && user.passwordHash) {
+    storedHash = user.passwordHash;
+    if (passwordHash === storedHash) {
+      await db.ref(`authSecrets/${userKey}`).set({ passwordHash: storedHash });
+      await db.ref(`users/${userKey}/passwordHash`).remove();
+    }
+  }
+
+  if (!storedHash || passwordHash !== storedHash) {
     return res.status(401).json({ ok: false, error: '비밀번호가 틀렸습니다.' });
   }
 

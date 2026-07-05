@@ -29,8 +29,12 @@ function checkCost(user, cost) {
     const held = (user.items && user.items[cost.key]) || 0;
     if (held < cost.amount) return { ok: false, error: `${ITEM_NAMES[cost.key]}이(가) ${cost.amount}개 필요합니다.` };
   } else if (cost.type === 'star') {
-    const stored = (user.storedStars && user.storedStars[cost.level]) || 0;
-    if (stored < cost.amount) return { ok: false, error: `${STAGES[cost.level].name}(+${cost.level}강) 별이 ${cost.amount}개 필요합니다.` };
+    const key = stageKey(cost.level, user.track);
+    const stored = (user.storedStars && user.storedStars[key]) || 0;
+    if (stored < cost.amount) {
+      const stage = resolveStage(cost.level, user.track);
+      return { ok: false, error: `${stage ? stage.name : '?'}(+${cost.level}강) 별이 ${cost.amount}개 필요합니다.` };
+    }
   }
   return { ok: true };
 }
@@ -78,6 +82,12 @@ async function storeStar() {
 function formatNumber(n) {
   if (n === null || n === undefined) return '-';
   return n.toLocaleString();
+}
+
+// ─── 별 이미지 경로 (공통은 star_N.png, 트랙 구간은 star_trackX_N.png) ──
+
+function starImagePath(level, track) {
+  return level <= 16 ? `images/star_${level}.png` : `images/star_${track}_${level}.png`;
 }
 
 // ─── 별 타입 → CSS 클래스 ────────────────────────────────────

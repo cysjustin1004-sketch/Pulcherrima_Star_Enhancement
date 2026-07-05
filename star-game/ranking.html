@@ -68,14 +68,14 @@ async function renderRanking() {
   snap.forEach(child => {
     const d = child.val();
     if (d.banned) return; // 벤 유저는 랭킹에서 제외
-    users.push({ nickname: d.nickname, bestStar: d.bestStar || 0 });
+    users.push({ nickname: d.nickname, bestStar: d.bestStar || 0, bestTrack: d.bestTrack || null });
   });
   users.sort((a, b) => b.bestStar - a.bestStar);
 
   list.innerHTML = '';
   users.forEach((u, i) => {
     const rank     = i + 1;
-    const stage    = STAGES[u.bestStar] || STAGES[0];
+    const stage    = resolveStage(u.bestStar, u.bestTrack) || COMMON_STAGES[0];
     const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
 
     const item = document.createElement('div');

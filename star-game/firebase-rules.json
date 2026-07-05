@@ -19,6 +19,11 @@
       }
     },
 
+    "authSecrets": {
+      ".read": false,
+      ".write": false
+    },
+
     "config": {
       ".read": false,
       ".write": false

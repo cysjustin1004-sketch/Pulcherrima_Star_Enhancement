@@ -1,6 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { RECIPES, ITEM_NAMES } = require('../../lib/game-config');
+const { RECIPES, ITEM_NAMES, stageKey } = require('../../lib/game-config');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
@@ -38,19 +38,26 @@ module.exports = async (req, res) => {
 
   // 결과물 지급
   const out = recipe.output;
+  let resolvedLevel = null;
   if (out.type === 'protection') {
     upd[`users/${userKey}/protectionScrolls`] = (user.protectionScrolls || 0) + out.amount;
   } else if (out.type === 'star') {
+    // trackRelative: 제작자 본인 트랙의 N번째 트랙 단계(level = 17+N) 별을 지급
+    resolvedLevel = out.trackRelative != null ? 17 + out.trackRelative : out.level;
+    if (out.trackRelative != null && !user.track) {
+      return res.status(400).json({ ok: false, error: '아직 트랙에 진입하지 않아 조합할 수 없습니다.' });
+    }
     // 별 보관함에 추가
-    const stored = (user.storedStars && user.storedStars[out.level]) || 0;
-    upd[`users/${userKey}/storedStars/${out.level}`] = stored + 1;
+    const key = stageKey(resolvedLevel, user.track);
+    const stored = (user.storedStars && user.storedStars[key]) || 0;
+    upd[`users/${userKey}/storedStars/${key}`] = stored + 1;
     // 도감 해금
     const unlocked = user.unlockedCodex || [];
-    if (!unlocked.includes(out.level)) {
-      upd[`users/${userKey}/unlockedCodex`] = [...unlocked, out.level];
+    if (!unlocked.includes(key)) {
+      upd[`users/${userKey}/unlockedCodex`] = [...unlocked, key];
     }
   }
 
   await db.ref().update(upd);
-  res.json({ ok: true, recipeId, output: out });
+  res.json({ ok: true, recipeId, output: { ...out, level: resolvedLevel } });
 };

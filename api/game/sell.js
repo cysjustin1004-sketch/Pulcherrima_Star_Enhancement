@@ -1,6 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { STAGES } = require('../../lib/game-config');
+const { resolveStage } = require('../../lib/game-config');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
   if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
 
   const user = snap.val();
-  const stage = STAGES[user.currentStar || 0];
+  const stage = resolveStage(user.currentStar || 0, user.track);
 
   if (!stage || !stage.sellPrice) {
     return res.status(400).json({ ok: false, error: '이 별은 판매할 수 없습니다.' });

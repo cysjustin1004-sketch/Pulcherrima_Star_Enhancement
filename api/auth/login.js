@@ -1,13 +1,10 @@
 const crypto = require('crypto');
 const db = require('../../lib/firebase-admin');
 const { createSession } = require('../../lib/session');
+const { nicknameToKey } = require('../../lib/game-config');
 
 function sha256(text) {
   return crypto.createHash('sha256').update(text).digest('hex');
-}
-
-function nicknameToKey(nickname) {
-  return nickname.trim().toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
 }
 
 module.exports = async (req, res) => {

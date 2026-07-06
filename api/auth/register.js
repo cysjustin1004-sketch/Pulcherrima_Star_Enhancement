@@ -1,10 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { createSession } = require('../../lib/session');
-const { STARTING_HYDROGEN } = require('../../lib/game-config');
-
-function nicknameToKey(nickname) {
-  return nickname.trim().toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
-}
+const { STARTING_HYDROGEN, nicknameToKey } = require('../../lib/game-config');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
@@ -33,6 +29,8 @@ module.exports = async (req, res) => {
     currentStar: 0,
     bestStar: 0,
     protectionScrolls: 0,
+    battleWins: 0,
+    battleLosses: 0,
     unlockedCodex: [0],
     items: {
       stellar_wind: 0, hypergiant_core: 0, supernova_glow: 0,

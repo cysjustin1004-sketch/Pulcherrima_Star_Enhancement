@@ -46,6 +46,23 @@
       <button class="btn-success" id="btn-give-hydrogen" style="width:100%; margin-top:0.5rem;">💧 수소 지급</button>
     </div>
 
+    <!-- 치트 계정 생성 (QA/도감 확인용) -->
+    <div class="card">
+      <div class="card-title">치트 계정 생성 (도감 62개 전부 해금)</div>
+      <div style="font-size:0.82rem; color:var(--text-sub); margin-bottom:0.75rem;">
+        닉네임/비밀번호로 도감이 전부 해금된 테스트용 계정을 만듭니다. 이미 있는 닉네임이면 해당 계정을 덮어써서 갱신합니다.
+      </div>
+      <div class="form-group">
+        <label class="form-label">닉네임</label>
+        <input type="text" id="cheat-nickname" placeholder="cheat" maxlength="12">
+      </div>
+      <div class="form-group">
+        <label class="form-label">비밀번호</label>
+        <input type="text" id="cheat-password" placeholder="cheat1234">
+      </div>
+      <button class="btn-blue" id="btn-create-cheat" style="width:100%; margin-top:0.5rem;">치트 계정 생성</button>
+    </div>
+
     <!-- 유저 목록 -->
     <div class="card">
       <div class="card-title">전체 유저 목록</div>
@@ -280,6 +297,30 @@ async function toggleBan(userKey, nickname, currentlyBanned) {
     showToast(data.error || '처리 실패');
   }
 }
+
+// ─── 치트 계정 생성 (QA/도감 확인용) ─────────────────
+
+document.getElementById('btn-create-cheat').addEventListener('click', async () => {
+  const nickname = document.getElementById('cheat-nickname').value.trim() || 'cheat';
+  const password = document.getElementById('cheat-password').value.trim() || 'cheat1234';
+
+  const res = await fetch('/api/admin/maintenance', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'X-Admin-Token': adminToken || '',
+    },
+    body: JSON.stringify({ action: 'create-cheat-account', nickname, password }),
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    showToast(`치트 계정 생성 완료! 닉네임: ${data.nickname} / 비밀번호: ${password} (도감 ${data.totalUnlocked}개 해금)`);
+    await loadUsers();
+  } else {
+    showToast(data.error || '생성 실패');
+  }
+});
 
 // ─── 위험 구역: 전체 유저 데이터 초기화 ─────────────
 

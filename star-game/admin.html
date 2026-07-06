@@ -180,7 +180,7 @@ async function loadUsers() {
     const isBanned = !!user.banned;
     row.innerHTML = `
       <div class="admin-user-info">
-        <div class="admin-user-nick">${escapeHtml(user.nickname || user.key)}${isBanned ? ' <span style="color:var(--danger);font-size:0.75rem;">[벤]</span>' : ''}</div>
+        <div class="admin-user-nick">${escapeHtml(user.nickname || user.key)}${isBanned ? ' <span style="color:var(--danger);font-size:0.75rem;">[벤]</span>' : ''}${user.isCheat ? ' <span style="color:var(--blue);font-size:0.75rem;">[치트]</span>' : ''}</div>
         <div class="admin-user-stat">
           💧 ${formatNumber(user.hydrogen || 0)} · ⭐ +${user.currentStar || 0} · 최고 +${user.bestStar || 0} · 방지권 ${user.protectionScrolls || 0}
         </div>

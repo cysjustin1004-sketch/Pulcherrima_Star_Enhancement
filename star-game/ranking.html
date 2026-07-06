@@ -67,7 +67,8 @@ async function renderRanking() {
   const users = [];
   snap.forEach(child => {
     const d = child.val();
-    if (d.banned) return; // 벤 유저는 랭킹에서 제외
+    if (d.banned) return;  // 벤 유저는 랭킹에서 제외
+    if (d.isCheat) return; // 치트 계정은 랭킹에서 제외
     users.push({ nickname: d.nickname, bestStar: d.bestStar || 0, bestTrack: d.bestTrack || null });
   });
   users.sort((a, b) => b.bestStar - a.bestStar);

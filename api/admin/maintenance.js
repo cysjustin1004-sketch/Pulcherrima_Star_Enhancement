@@ -70,6 +70,7 @@ module.exports = async (req, res) => {
     await db.ref(`authSecrets/${userKey}`).set({ passwordHash });
     await db.ref(`users/${userKey}`).set({
       nickname,
+      isCheat: true,
       hydrogen: 999999999999,
       currentStar: 24,
       track: 'track1',

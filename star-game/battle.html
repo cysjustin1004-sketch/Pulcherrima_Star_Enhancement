@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>배틀 — 별 강화하기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Sora:wght@700;900&family=Hanken+Grotesk:wght@400;500;700;900&family=Geist:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="page" id="list-view">
+  <h1 class="page-title">⚔ 배틀</h1>
+  <div style="font-size:0.82rem; color:var(--text-sub); text-align:center; margin-bottom:1rem;">
+    친구 목록에서 상대를 골라 배틀하세요 (상대가 접속 중이 아니어도 가능)
+  </div>
+
+  <div id="opponent-list">
+    <div style="text-align:center; color:var(--text-sub); padding:2rem;">로딩 중...</div>
+  </div>
+</div>
+
+<!-- ───────────────── 배틀 미리보기 모달 ───────────────── -->
+<div class="codex-modal-bg" id="preview-modal-bg">
+  <div class="codex-modal">
+    <div class="battle-arena" style="padding:1rem 0;">
+      <div class="battle-star-slot mine"><img id="preview-my-star" src="" alt=""></div>
+      <div class="battle-vs" style="color:var(--text);">VS</div>
+      <div class="battle-star-slot theirs"><img id="preview-opp-star" src="" alt=""></div>
+    </div>
+    <div class="codex-modal-name" id="preview-opp-name" style="text-align:center;"></div>
+    <div class="codex-modal-sub" id="preview-levels" style="text-align:center;"></div>
+
+    <div class="card" style="margin-top:1rem;">
+      <div class="battle-preview-winrate">
+        <span style="color:var(--text-sub);">내 승률</span>
+        <span style="font-weight:900;" id="preview-winrate-text">-</span>
+      </div>
+      <div class="rate-bar"><div class="rate-fill" id="preview-winrate-fill" style="width:0%;"></div></div>
+      <div class="battle-preview-remaining" id="preview-remaining"></div>
+    </div>
+
+    <button class="btn-enhance mt-1" id="btn-start-battle">⚔ 배틀 시작</button>
+    <button class="btn-secondary w-100 mt-05" id="preview-modal-close">닫기</button>
+  </div>
+</div>
+
+<!-- ───────────────── 배틀 연출 + 결과 오버레이 ───────────────── -->
+<div class="result-overlay" id="battle-overlay">
+  <div class="battle-arena" id="battle-arena" style="position:relative;">
+    <div class="battle-flash-overlay" id="battle-flash"></div>
+    <div class="battle-star-slot mine"><img id="battle-my-star" src="" alt=""></div>
+    <div class="battle-vs">VS</div>
+    <div class="battle-star-slot theirs"><img id="battle-opp-star" src="" alt=""></div>
+  </div>
+  <div class="result-title" id="battle-result-title" style="display:none;"></div>
+  <div class="result-desc" id="battle-result-desc" style="display:none;"></div>
+  <div id="battle-confirm-section" style="display:none; width:100%; max-width:280px;">
+    <button class="btn-primary" id="btn-battle-confirm">확인</button>
+  </div>
+</div>
+
+<!-- ───────────────── 하단 네비게이션 ───────────────── -->
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html">
+    <span class="nav-icon">⭐</span>강화
+  </a>
+  <a class="nav-item" href="codex.html">
+    <span class="nav-icon">📖</span>도감
+  </a>
+  <a class="nav-item" href="ranking.html">
+    <span class="nav-icon">🏆</span>랭킹
+  </a>
+  <a class="nav-item" href="messages.html">
+    <span class="nav-icon">💬</span>메시지
+  </a>
+  <a class="nav-item" href="#" id="nav-logout">
+    <span class="nav-icon">🚪</span>로그아웃
+  </a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="firebase.js"></script>
+<script src="auth.js"></script>
+<script src="game.js"></script>
+<script>
+const session = requireAuth();
+if (!session) throw new Error('no session');
+
+let myUser = null;
+let selectedOpponent = null; // { userKey, nickname }
+let lastPreview = null;
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ─── 친구(배틀 상대) 목록 ─────────────────────────────
+
+async function loadOpponents() {
+  const list = document.getElementById('opponent-list');
+  const res = await apiCall('/api/friends/list', {});
+  if (!res.ok) { list.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:2rem;">목록을 불러오지 못했습니다.</div>'; return; }
+
+  const friends = res.friends || [];
+  if (friends.length === 0) {
+    list.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:2rem;">아직 친구가 없습니다. 메시지 탭에서 먼저 친구를 추가하세요.</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  friends.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'battle-opponent-row';
+    row.innerHTML = `
+      <div class="friend-avatar"><img src="${starImagePath(f.currentStar, f.track)}" alt=""></div>
+      <div class="battle-opponent-info">
+        <div class="battle-opponent-name">${escapeHtml(f.nickname)}</div>
+        <div class="battle-opponent-level">+${f.currentStar}강</div>
+        <div class="battle-opponent-record">전적 ${f.battleWins}승 ${f.battleLosses}패</div>
+      </div>
+    `;
+    const btn = document.createElement('button');
+    btn.className = 'btn-danger';
+    btn.textContent = '배틀';
+    btn.addEventListener('click', () => openPreview(f.userKey, f.nickname));
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+
+// ─── 배틀 미리보기 ────────────────────────────────────
+
+async function openPreview(opponentKey, nickname) {
+  const res = await apiCall('/api/battle/preview', { opponentKey });
+  if (!res.ok) { showToast(res.error || '미리보기를 불러오지 못했습니다.'); return; }
+
+  selectedOpponent = { userKey: opponentKey, nickname };
+  lastPreview = res;
+
+  document.getElementById('preview-my-star').src  = starImagePath(res.me.currentStar, res.me.track);
+  document.getElementById('preview-opp-star').src = starImagePath(res.opponent.currentStar, res.opponent.track);
+  document.getElementById('preview-opp-name').textContent = res.opponent.nickname;
+  document.getElementById('preview-levels').textContent =
+    `나 +${res.me.currentStar}강 (${res.me.stageName})  vs  상대 +${res.opponent.currentStar}강 (${res.opponent.stageName})`;
+
+  const pct = Math.round(res.winProb * 100);
+  document.getElementById('preview-winrate-text').textContent = `${pct}%`;
+  const fill = document.getElementById('preview-winrate-fill');
+  fill.style.width = `${pct}%`;
+  fill.style.background = pct >= 50 ? 'var(--success)' : 'var(--danger)';
+
+  const remainEl = document.getElementById('preview-remaining');
+  remainEl.textContent = `오늘 이 상대와 남은 배틀 횟수: ${res.remainingToday}회`;
+
+  const startBtn = document.getElementById('btn-start-battle');
+  startBtn.disabled = res.remainingToday <= 0;
+  startBtn.textContent = res.remainingToday <= 0 ? '오늘 횟수 소진' : '⚔ 배틀 시작';
+
+  document.getElementById('preview-modal-bg').classList.add('visible');
+}
+
+document.getElementById('preview-modal-close').addEventListener('click', () => {
+  document.getElementById('preview-modal-bg').classList.remove('visible');
+});
+
+document.getElementById('btn-start-battle').addEventListener('click', async () => {
+  document.getElementById('preview-modal-bg').classList.remove('visible');
+  await startBattle();
+});
+
+// ─── 배틀 연출 + 실행 ─────────────────────────────────
+
+async function startBattle() {
+  if (!selectedOpponent) return;
+
+  document.getElementById('battle-my-star').src  = starImagePath(lastPreview.me.currentStar, lastPreview.me.track);
+  document.getElementById('battle-opp-star').src = starImagePath(lastPreview.opponent.currentStar, lastPreview.opponent.track);
+  document.getElementById('battle-result-title').style.display = 'none';
+  document.getElementById('battle-result-desc').style.display = 'none';
+  document.getElementById('battle-confirm-section').style.display = 'none';
+
+  const overlay = document.getElementById('battle-overlay');
+  const arena   = document.getElementById('battle-arena');
+  const flash   = document.getElementById('battle-flash');
+  arena.classList.remove('fusing');
+  flash.classList.remove('flashing');
+  overlay.classList.add('visible');
+
+  // 서버 실행과 연출을 동시에 진행, 연출이 끝난 뒤 결과 표시
+  const execPromise = apiCall('/api/battle/execute', { opponentKey: selectedOpponent.userKey });
+
+  // 다음 프레임에 애니메이션 클래스 부여 (강제 reflow로 애니메이션 확실히 재생)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      arena.classList.add('fusing');
+      flash.classList.add('flashing');
+    });
+  });
+
+  const [res] = await Promise.all([
+    execPromise,
+    new Promise(r => setTimeout(r, 1800)), // 연출 재생 시간 확보
+  ]);
+
+  if (!res.ok) {
+    showToast(res.error || '배틀 실패');
+    overlay.classList.remove('visible');
+    return;
+  }
+
+  const win = res.result === 'win';
+  const titleEl = document.getElementById('battle-result-title');
+  const descEl  = document.getElementById('battle-result-desc');
+  titleEl.textContent = win ? '🏆 승리!' : '💥 패배...';
+  titleEl.className = 'result-title ' + (win ? 'success' : 'fail');
+  titleEl.style.display = '';
+
+  const deltaText = res.hydrogenDelta >= 0
+    ? `${selectedOpponent.nickname}에게서 수소 ${formatNumber(res.hydrogenDelta)}을 빼앗았습니다!`
+    : `${selectedOpponent.nickname}에게 수소 ${formatNumber(-res.hydrogenDelta)}을 빼앗겼습니다.`;
+  descEl.textContent = `${deltaText} (내 수소: ${formatNumber(res.myHydrogen)})`;
+  descEl.style.display = '';
+
+  document.getElementById('battle-confirm-section').style.display = '';
+  document.getElementById('btn-battle-confirm').onclick = async () => {
+    overlay.classList.remove('visible');
+    arena.classList.remove('fusing');
+    flash.classList.remove('flashing');
+    await loadOpponents();
+  };
+}
+
+// ─── 토스트 ─────────────────────────────────────────
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 2200);
+}
+
+// ─── 로그아웃 ─────────────────────────────────────────
+
+document.getElementById('nav-logout').addEventListener('click', e => {
+  e.preventDefault();
+  if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
+});
+
+// ─── 초기 로드 (?with=<key> 로 바로 미리보기 열기 지원) ─────
+
+(async () => {
+  myUser = await loadCurrentUser();
+  await loadOpponents();
+
+  const params = new URLSearchParams(location.search);
+  const withKey = params.get('with');
+  if (withKey) {
+    const res = await apiCall('/api/friends/list', {});
+    const f = (res.friends || []).find(x => x.userKey === withKey);
+    if (f) openPreview(f.userKey, f.nickname);
+  }
+})();
+</script>
+</body>
+</html>

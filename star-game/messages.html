@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>메시지 — 별 강화하기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Sora:wght@700;900&family=Hanken+Grotesk:wght@400;500;700;900&family=Geist:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ───────────────── 목록 화면(친구 목록 + 대화) ───────────────── -->
+<div class="page" id="list-view">
+  <h1 class="page-title">💬 메시지</h1>
+
+  <div class="add-friend-box">
+    <input type="text" id="friend-search-input" placeholder="닉네임으로 친구 검색">
+    <button class="btn-primary" id="btn-friend-search" style="width:auto;">검색</button>
+  </div>
+  <div id="search-results"></div>
+
+  <div id="incoming-requests-section" style="display:none;">
+    <div class="section-label">받은 친구 요청</div>
+    <div id="incoming-requests-list"></div>
+  </div>
+
+  <div class="section-label">친구 목록</div>
+  <div id="friend-list">
+    <div style="text-align:center; color:var(--text-sub); padding:2rem;">로딩 중...</div>
+  </div>
+</div>
+
+<!-- ───────────────── 채팅 화면 ───────────────── -->
+<div id="chat-view" style="display:none;">
+  <div class="chat-header">
+    <button class="chat-back" id="btn-chat-back">←</button>
+    <div class="chat-header-name" id="chat-header-name" style="cursor:pointer;">닉네임</div>
+  </div>
+  <div class="chat-messages" id="chat-messages"></div>
+</div>
+
+<div class="chat-input-bar" id="chat-input-bar" style="display:none;">
+  <input type="text" id="chat-input" placeholder="메시지 입력..." maxlength="500">
+  <button class="btn-primary" id="btn-chat-send" style="width:auto;">전송</button>
+</div>
+
+<!-- ───────────────── 상대 프로필 모달 ───────────────── -->
+<div class="codex-modal-bg" id="profile-modal-bg">
+  <div class="codex-modal">
+    <div class="codex-modal-level" id="profile-star-level"></div>
+    <div class="codex-modal-name" id="profile-nickname"></div>
+    <div class="codex-modal-sub" id="profile-star-name"></div>
+    <div class="star-visual" style="margin:1rem auto;">
+      <img class="star-img" id="profile-star-img" src="" alt="">
+    </div>
+    <div class="codex-modal-desc" id="profile-record" style="text-align:center;"></div>
+    <button class="btn-primary mt-1" id="btn-goto-battle">⚔ 배틀하러 가기</button>
+    <button class="btn-secondary w-100 mt-05" id="profile-modal-close">닫기</button>
+  </div>
+</div>
+
+<!-- ───────────────── 하단 네비게이션 ───────────────── -->
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html">
+    <span class="nav-icon">⭐</span>강화
+  </a>
+  <a class="nav-item" href="codex.html">
+    <span class="nav-icon">📖</span>도감
+  </a>
+  <a class="nav-item" href="ranking.html">
+    <span class="nav-icon">🏆</span>랭킹
+  </a>
+  <a class="nav-item active" href="messages.html">
+    <span class="nav-icon">💬</span>메시지
+  </a>
+  <a class="nav-item" href="#" id="nav-logout">
+    <span class="nav-icon">🚪</span>로그아웃
+  </a>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="config.js"></script>
+<script src="firebase.js"></script>
+<script src="auth.js"></script>
+<script src="game.js"></script>
+<script>
+const session = requireAuth();
+if (!session) throw new Error('no session');
+
+let friendCache = [];   // 최근 friends/list 결과 캐시(프로필/배틀 이동에 사용)
+let currentChatWith = null;
+let chatPollTimer = null;
+
+// ─── 목록 렌더링 ─────────────────────────────────────
+
+async function loadList() {
+  const res = await apiCall('/api/friends/list', {});
+  if (!res.ok) { showToast(res.error || '목록을 불러오지 못했습니다.'); return; }
+  friendCache = res.friends;
+  renderIncoming(res.incoming);
+  renderFriends(res.friends);
+}
+
+function renderIncoming(incoming) {
+  const section = document.getElementById('incoming-requests-section');
+  const list = document.getElementById('incoming-requests-list');
+  if (!incoming || incoming.length === 0) { section.style.display = 'none'; return; }
+
+  section.style.display = '';
+  list.innerHTML = '';
+  incoming.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'request-row';
+    row.innerHTML = `
+      <div class="request-info">
+        <div class="request-name">${escapeHtml(r.fromNickname)}</div>
+        <div class="friend-preview">친구 요청을 보냈습니다</div>
+      </div>
+      <div class="request-actions">
+        <button class="btn-success" data-key="${r.fromKey}" data-action="accept">수락</button>
+        <button class="btn-danger"  data-key="${r.fromKey}" data-action="reject">거절</button>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+
+  list.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const fromKey = btn.dataset.key;
+      const action  = btn.dataset.action;
+      const res = await apiCall('/api/friends/respond', { fromKey, action });
+      if (res.ok) {
+        showToast(action === 'accept' ? '친구로 등록했습니다.' : '요청을 거절했습니다.');
+        await loadList();
+      } else {
+        showToast(res.error || '처리 실패');
+      }
+    });
+  });
+}
+
+function renderFriends(friends) {
+  const list = document.getElementById('friend-list');
+  if (!friends || friends.length === 0) {
+    list.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:2rem;">아직 친구가 없습니다. 위에서 검색해 친구를 추가해보세요.</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  friends.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'friend-row';
+    const initial = (f.nickname || '?').charAt(0);
+    row.innerHTML = `
+      <div class="friend-avatar" style="font-weight:900; font-size:1.1rem;">${escapeHtml(initial)}</div>
+      <div class="friend-info">
+        <div class="friend-name">${escapeHtml(f.nickname)}</div>
+        <div class="friend-preview">${f.lastText ? escapeHtml(f.lastText) : '대화를 시작해보세요'}</div>
+      </div>
+      <div class="friend-meta">${f.lastAt ? formatTime(f.lastAt) : ''}</div>
+    `;
+    row.addEventListener('click', () => openChat(f.userKey, f.nickname));
+    list.appendChild(row);
+  });
+}
+
+function formatTime(ts) {
+  const d = new Date(ts);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  }
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ─── 친구 검색 / 요청 ─────────────────────────────────
+
+document.getElementById('btn-friend-search').addEventListener('click', doSearch);
+document.getElementById('friend-search-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doSearch();
+});
+
+async function doSearch() {
+  const input = document.getElementById('friend-search-input');
+  const q = input.value.trim();
+  const box = document.getElementById('search-results');
+  if (!q) { box.innerHTML = ''; return; }
+
+  const res = await apiCall('/api/friends/search', { query: q });
+  if (!res.ok || !res.results || res.results.length === 0) {
+    box.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:0.75rem 0;">사용자를 찾을 수 없습니다.</div>';
+    return;
+  }
+
+  box.innerHTML = '';
+  res.results.forEach(u => {
+    const alreadyFriend = friendCache.some(f => f.userKey === u.userKey);
+    const row = document.createElement('div');
+    row.className = 'friend-row';
+    row.innerHTML = `
+      <div class="friend-avatar" style="font-weight:900; font-size:1.1rem;">${escapeHtml(u.nickname.charAt(0))}</div>
+      <div class="friend-info">
+        <div class="friend-name">${escapeHtml(u.nickname)}</div>
+        <div class="friend-record">+${u.currentStar}강 · 배틀 ${u.battleWins}승 ${u.battleLosses}패</div>
+      </div>
+    `;
+    if (!alreadyFriend) {
+      const btn = document.createElement('button');
+      btn.className = 'btn-primary';
+      btn.style.width = 'auto';
+      btn.style.flexShrink = '0';
+      btn.textContent = '친구 요청';
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const r = await apiCall('/api/friends/request', { toKey: u.userKey });
+        if (r.ok) {
+          showToast(r.autoAccepted ? '서로 친구 요청이 있어 바로 친구가 되었습니다!' : '친구 요청을 보냈습니다.');
+          input.value = '';
+          box.innerHTML = '';
+          await loadList();
+        } else {
+          showToast(r.error || '요청 실패');
+        }
+      });
+      row.appendChild(btn);
+    }
+    box.appendChild(row);
+  });
+}
+
+// ─── 채팅 뷰 ─────────────────────────────────────────
+
+function openChat(userKey, nickname) {
+  currentChatWith = userKey;
+  document.getElementById('list-view').style.display = 'none';
+  document.getElementById('chat-view').style.display = '';
+  document.getElementById('chat-input-bar').style.display = 'flex';
+  document.getElementById('chat-header-name').textContent = nickname;
+  document.getElementById('chat-header-name').dataset.key = userKey;
+  document.getElementById('chat-messages').innerHTML = '';
+  loadHistory();
+  chatPollTimer = setInterval(loadHistory, 5000);
+}
+
+function closeChat() {
+  currentChatWith = null;
+  document.getElementById('list-view').style.display = '';
+  document.getElementById('chat-view').style.display = 'none';
+  document.getElementById('chat-input-bar').style.display = 'none';
+  if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
+  loadList();
+}
+
+document.getElementById('btn-chat-back').addEventListener('click', closeChat);
+
+async function loadHistory() {
+  if (!currentChatWith) return;
+  const res = await apiCall('/api/messages/history', { withKey: currentChatWith });
+  if (!res.ok) return;
+  renderMessages(res.messages);
+}
+
+function renderMessages(messages) {
+  const box = document.getElementById('chat-messages');
+  const wasAtBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  box.innerHTML = '';
+  messages.forEach(m => {
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble ' + (m.from === session.userKey ? 'mine' : 'theirs');
+    bubble.textContent = m.text;
+    box.appendChild(bubble);
+  });
+  if (wasAtBottom || box.children.length <= 1) box.scrollTop = box.scrollHeight;
+}
+
+document.getElementById('btn-chat-send').addEventListener('click', sendChat);
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') sendChat();
+});
+
+async function sendChat() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || !currentChatWith) return;
+  input.value = '';
+  const res = await apiCall('/api/messages/send', { toKey: currentChatWith, text });
+  if (res.ok) {
+    await loadHistory();
+  } else {
+    showToast(res.error || '전송 실패');
+  }
+}
+
+// ─── 상대 프로필 모달 ─────────────────────────────────
+
+document.getElementById('chat-header-name').addEventListener('click', async () => {
+  const key = document.getElementById('chat-header-name').dataset.key;
+  if (!key) return;
+  const res = await apiCall('/api/battle/profile', { opponentKey: key });
+  if (!res.ok) { showToast(res.error || '프로필을 불러오지 못했습니다.'); return; }
+
+  const stage = resolveStage(res.currentStar, res.track) || COMMON_STAGES[0];
+  document.getElementById('profile-star-level').textContent = `+${res.currentStar}강`;
+  document.getElementById('profile-nickname').textContent = res.nickname;
+  document.getElementById('profile-star-name').textContent = stage.name;
+  document.getElementById('profile-star-img').src = starImagePath(res.currentStar, res.track);
+  document.getElementById('profile-record').textContent = `배틀 전적 ${res.battleWins}승 ${res.battleLosses}패`;
+  document.getElementById('btn-goto-battle').onclick = () => {
+    location.href = `battle.html?with=${encodeURIComponent(key)}`;
+  };
+  document.getElementById('profile-modal-bg').classList.add('visible');
+});
+
+document.getElementById('profile-modal-close').addEventListener('click', () => {
+  document.getElementById('profile-modal-bg').classList.remove('visible');
+});
+
+// ─── 토스트 ─────────────────────────────────────────
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 2200);
+}
+
+// ─── 로그아웃 ─────────────────────────────────────────
+
+document.getElementById('nav-logout').addEventListener('click', e => {
+  e.preventDefault();
+  if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
+});
+
+// ─── 초기 로드 (?with=<key> 로 바로 대화창 열기 지원) ─────
+
+(async () => {
+  await loadList();
+  const params = new URLSearchParams(location.search);
+  const withKey = params.get('with');
+  if (withKey) {
+    const f = friendCache.find(x => x.userKey === withKey);
+    if (f) openChat(f.userKey, f.nickname);
+  }
+})();
+</script>
+</body>
+</html>

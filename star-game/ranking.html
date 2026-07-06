@@ -12,7 +12,13 @@
 
 <div class="page">
   <h1 class="page-title">🏆 랭킹</h1>
-  <div style="font-size:0.82rem; color:var(--text-sub); text-align:center; margin-bottom:1rem;">
+
+  <div class="tab-row">
+    <button class="tab-btn active" id="tab-enhance">강화 랭킹</button>
+    <button class="tab-btn" id="tab-battle">배틀 랭킹</button>
+  </div>
+
+  <div style="font-size:0.82rem; color:var(--text-sub); text-align:center; margin-bottom:1rem;" id="rank-sub">
     bestStar 기준 상위 50명
   </div>
 
@@ -32,6 +38,9 @@
   <a class="nav-item active" href="ranking.html">
     <span class="nav-icon">🏆</span>랭킹
   </a>
+  <a class="nav-item" href="messages.html">
+    <span class="nav-icon">💬</span>메시지
+  </a>
   <a class="nav-item" href="#" id="nav-logout">
     <span class="nav-icon">🚪</span>로그아웃
   </a>
@@ -47,14 +56,20 @@
 const session = requireAuth();
 if (!session) throw new Error('no session');
 
-async function renderRanking() {
-  const list = document.getElementById('rank-list');
-  list.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:2rem;">로딩 중...</div>';
+let currentMode = 'enhance'; // 'enhance' | 'battle'
 
-  // Firebase: bestStar 내림차순, 상위 50명 쿼리
+async function renderRanking(mode) {
+  const list = document.getElementById('rank-list');
+  const sub  = document.getElementById('rank-sub');
+  list.innerHTML = '<div style="text-align:center; color:var(--text-sub); padding:2rem;">로딩 중...</div>';
+  sub.textContent = mode === 'battle' ? '배틀 승수 기준 상위 50명' : 'bestStar 기준 상위 50명';
+
+  const orderField = mode === 'battle' ? 'battleWins' : 'bestStar';
+
+  // Firebase: 내림차순 정렬을 위해 오름차순으로 상위 50명 쿼리 후 반전
   const snap = await firebase.database()
     .ref('users')
-    .orderByChild('bestStar')
+    .orderByChild(orderField)
     .limitToLast(50)
     .get();
 
@@ -63,31 +78,53 @@ async function renderRanking() {
     return;
   }
 
-  // Firebase 결과는 오름차순 → 내림차순으로 반전
   const users = [];
   snap.forEach(child => {
     const d = child.val();
-    if (d.banned) return; // 벤 유저는 랭킹에서 제외
-    users.push({ nickname: d.nickname, bestStar: d.bestStar || 0, bestTrack: d.bestTrack || null });
+    if (d.banned) return;  // 벤 유저는 랭킹에서 제외
+    if (d.isCheat) return; // 테스트/치트 계정은 랭킹에서 제외
+    users.push({
+      nickname:   d.nickname,
+      bestStar:   d.bestStar   || 0,
+      bestTrack:  d.bestTrack  || null,
+      battleWins: d.battleWins || 0,
+    });
   });
-  users.sort((a, b) => b.bestStar - a.bestStar);
+
+  if (mode === 'battle') {
+    users.sort((a, b) => b.battleWins - a.battleWins);
+  } else {
+    users.sort((a, b) => b.bestStar - a.bestStar);
+  }
 
   list.innerHTML = '';
   users.forEach((u, i) => {
     const rank     = i + 1;
-    const stage    = resolveStage(u.bestStar, u.bestTrack) || COMMON_STAGES[0];
     const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
 
     const item = document.createElement('div');
     item.className = 'rank-item';
-    item.innerHTML = `
-      <div class="rank-num">${rankIcon || rank}</div>
-      <div class="rank-info">
-        <div class="rank-nickname">${escapeHtml(u.nickname)}</div>
-        <div class="rank-star">+${u.bestStar}강 · ${stage.name}</div>
-      </div>
-      <div class="rank-level">+${u.bestStar}</div>
-    `;
+
+    if (mode === 'battle') {
+      item.innerHTML = `
+        <div class="rank-num">${rankIcon || rank}</div>
+        <div class="rank-info">
+          <div class="rank-nickname">${escapeHtml(u.nickname)}</div>
+          <div class="rank-star">${u.battleWins}승</div>
+        </div>
+        <div class="rank-level">${u.battleWins}🏅</div>
+      `;
+    } else {
+      const stage = resolveStage(u.bestStar, u.bestTrack) || COMMON_STAGES[0];
+      item.innerHTML = `
+        <div class="rank-num">${rankIcon || rank}</div>
+        <div class="rank-info">
+          <div class="rank-nickname">${escapeHtml(u.nickname)}</div>
+          <div class="rank-star">+${u.bestStar}강 · ${stage.name}</div>
+        </div>
+        <div class="rank-level">+${u.bestStar}</div>
+      `;
+    }
 
     // 내 항목 강조
     if (u.nickname === session.nickname) {
@@ -106,12 +143,28 @@ function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+document.getElementById('tab-enhance').addEventListener('click', () => {
+  if (currentMode === 'enhance') return;
+  currentMode = 'enhance';
+  document.getElementById('tab-enhance').classList.add('active');
+  document.getElementById('tab-battle').classList.remove('active');
+  renderRanking(currentMode);
+});
+
+document.getElementById('tab-battle').addEventListener('click', () => {
+  if (currentMode === 'battle') return;
+  currentMode = 'battle';
+  document.getElementById('tab-battle').classList.add('active');
+  document.getElementById('tab-enhance').classList.remove('active');
+  renderRanking(currentMode);
+});
+
 document.getElementById('nav-logout').addEventListener('click', e => {
   e.preventDefault();
   if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
 });
 
-(async () => { await renderRanking(); })();
+(async () => { await renderRanking(currentMode); })();
 </script>
 </body>
 </html>

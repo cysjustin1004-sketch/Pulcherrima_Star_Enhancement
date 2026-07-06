@@ -291,13 +291,13 @@ document.getElementById('btn-wipe-users').addEventListener('click', async () => 
     return;
   }
 
-  const res = await fetch('/api/admin/wipe-users', {
+  const res = await fetch('/api/admin/maintenance', {
     method:  'POST',
     headers: {
       'Content-Type':  'application/json',
       'X-Admin-Token': adminToken || '',
     },
-    body: JSON.stringify({ confirm: phrase }),
+    body: JSON.stringify({ action: 'wipe-users', confirm: phrase }),
   });
   const data = await res.json();
 

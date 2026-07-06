@@ -2,14 +2,16 @@
 // config.js — 별 강화하기 게임 설정
 // 이 파일만 수정하면 게임 수치/이름/설명을 모두 바꿀 수 있습니다.
 //
-// 레벨 체계 (v2 — 공통 17단계 + 5트랙 분기):
+// 레벨 체계 (v3 — 공통 17단계 + 5트랙 분기 + 공통 우주 엔딩):
 //   level 0~16  : 공통 구간 (성운 → 원시별 → 주계열 → 운명의 갈림길)
 //   level 17~24 : 트랙 구간 — level 16→17 강화 성공 시 서버가 5개 트랙 중
 //                 하나를 무작위 배정(user.track)하며, 이후 해당 트랙 고정.
 //                 트랙: track1(적색왜성) / track2(태양형 별) /
 //                       track3(대질량 별) / track4(초대질량 별) /
 //                       track5(극초대질량 별)
-//   level 24    : 각 트랙의 최종 엔딩 (강화 불가)
+//   level 25~29 : 트랙 종료 후 다시 합류하는 공통 구간(트랙 무관) —
+//                 별 하나에서 은하 → 은하군 → 은하단 → 초은하단 → 우주로 시야가 확대된다.
+//   level 29    : 최종 엔딩 (강화 불가)
 // ============================================================
 
 // 아이템 키 (Firebase 저장 키로 사용)
@@ -301,8 +303,9 @@ const TRACKS = {
       drop: null,
       codexDescription: '【냉각 기간: 수십억~수조 년】 더 이상 핵융합을 하지 않는 백색왜성이 아주 서서히 식어가는 과정. 표면온도가 낮아질수록 빛깔도 희미해진다.' },
     { level: 24, name: '흑색왜성', subname: '완전 소등 · 이론상', type: '이론적 최종 잔해',
-      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
-      codexDescription: '【우주에 아직 하나도 존재하지 않음】 백색왜성이 완전히 식어 빛을 잃은 상태. 우주가 아직 그만큼 늙지 않아 실제로는 이론상으로만 존재하는, 저질량 별 진화의 최종 종착지다.' },
+      cost: { type: 'star', level: 24, amount: 1 }, successRate: 0.40, sellPrice: 750000000, protectionCost: 23,
+      drop: null,
+      codexDescription: '【우주에 아직 하나도 존재하지 않음】 백색왜성이 완전히 식어 빛을 잃은 상태. 우주가 아직 그만큼 늙지 않아 실제로는 이론상으로만 존재하는, 저질량 별 진화의 최종 종착지다. 또 하나의 흑색왜성을 만들어내면 그 중력이 시야를 은하 전체로 넓혀준다.' },
   ],
   track2: [
     { level: 17, name: '적색거성', subname: '알데바란', type: '적색거성',
@@ -334,8 +337,9 @@ const TRACKS = {
       drop: null,
       codexDescription: '【표면온도: 약 20만K】 행성상성운 중심에 남는 뜨겁고 조밀한 잔해. NGC 2440의 중심별은 알려진 백색왜성 중 가장 뜨거운 축에 속한다.' },
     { level: 24, name: '흑색왜성', subname: '완전 소등 · 이론상', type: '이론적 최종 잔해',
-      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
-      codexDescription: '【우주에 아직 하나도 존재하지 않음】 태양형 별의 백색왜성 잔해 역시 극한의 시간 뒤에는 빛을 잃은 흑색왜성이 될 것으로 예측되는 진화의 최종 종착지다.' },
+      cost: { type: 'star', level: 24, amount: 1 }, successRate: 0.40, sellPrice: 750000000, protectionCost: 23,
+      drop: null,
+      codexDescription: '【우주에 아직 하나도 존재하지 않음】 태양형 별의 백색왜성 잔해 역시 극한의 시간 뒤에는 빛을 잃은 흑색왜성이 될 것으로 예측되는 진화의 최종 종착지다. 또 하나의 흑색왜성을 만들어내면 그 중력이 시야를 은하 전체로 넓혀준다.' },
   ],
   track3: [
     { level: 17, name: '청색초거성', subname: '리겔', type: '청색초거성',
@@ -367,8 +371,9 @@ const TRACKS = {
       drop: null,
       codexDescription: '【직경: 약 20km / 질량: 태양의 약 1.4배】 1967년 조슬린 벨이 발견한 인류 최초의 펄사. 중성자별이 회전하며 방출하는 전파 빔임이 밝혀졌다.' },
     { level: 24, name: '펄사', subname: '게 펄사 · PSR B0531+21', type: '펄사',
-      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
-      codexDescription: '【직경: 약 28km / 회전주기: 초당 30회】 게 성운 중심의 중성자별. 표면 중력이 지구의 2천억 배에 달하는, 대질량 별 진화의 최종 종착지다.' },
+      cost: { type: 'star', level: 24, amount: 1 }, successRate: 0.40, sellPrice: 750000000, protectionCost: 23,
+      drop: null,
+      codexDescription: '【직경: 약 28km / 회전주기: 초당 30회】 게 성운 중심의 중성자별. 표면 중력이 지구의 2천억 배에 달하는, 대질량 별 진화의 최종 종착지다. 또 하나의 펄사를 만들어내면 그 중력이 시야를 은하 전체로 넓혀준다.' },
   ],
   track4: [
     { level: 17, name: 'O형 초거성', subname: '제타 퍼페이', type: 'O형 초거성',
@@ -400,8 +405,9 @@ const TRACKS = {
       drop: null,
       codexDescription: '【질량: 태양의 약 21배】 인류 최초로 확인된 블랙홀 후보. 약 6,100광년 거리에서 동반성의 물질을 빨아들이며 강렬한 X선을 방출한다. 스티븐 호킹이 킵 손과 이 천체를 놓고 내기를 했으며, 호킹이 졌다.' },
     { level: 24, name: 'X선 쌍성 블랙홀', subname: 'MAXI J1348-630', type: 'X선 쌍성 블랙홀',
-      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
-      codexDescription: '【발견: 2019년】 동반성의 물질을 빨아들이며 강력한 제트와 X선을 방출하는 활동적인 블랙홀 쌍성계. 초대질량 별 진화의 최종 종착지다.' },
+      cost: { type: 'star', level: 24, amount: 1 }, successRate: 0.40, sellPrice: 750000000, protectionCost: 23,
+      drop: null,
+      codexDescription: '【발견: 2019년】 동반성의 물질을 빨아들이며 강력한 제트와 X선을 방출하는 활동적인 블랙홀 쌍성계. 초대질량 별 진화의 최종 종착지다. 또 하나의 블랙홀을 만들어내면 그 중력이 시야를 은하 전체로 넓혀준다.' },
   ],
   track5: [
     { level: 17, name: '극초거성', subname: 'UY 방패자리', type: '극초거성',
@@ -433,22 +439,53 @@ const TRACKS = {
       drop: null,
       codexDescription: '【중심 블랙홀 질량: 태양의 약 9억 배 / 광도: 태양의 약 4조 배】 24억 광년 거리의 가장 밝은 퀘이사 중 하나. 1963년 최초로 확인되었으며 맨눈 한계에 가까울 정도로 밝다.' },
     { level: 24, name: '초대질량 블랙홀', subname: '궁수자리 A*', type: '초대질량 블랙홀',
-      cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
-      codexDescription: '【질량: 태양의 약 400만 배】 우리 은하 중심의 초대질량 블랙홀. 2022년 사건지평선망원경(EHT)이 두 번째 블랙홀 사진으로 공개했다. 극초대질량 별 진화의 최종 종착지다.' },
+      cost: { type: 'star', level: 24, amount: 1 }, successRate: 0.40, sellPrice: 750000000, protectionCost: 23,
+      drop: null,
+      codexDescription: '【질량: 태양의 약 400만 배】 우리 은하 중심의 초대질량 블랙홀. 2022년 사건지평선망원경(EHT)이 두 번째 블랙홀 사진으로 공개했다. 극초대질량 별 진화의 최종 종착지다. 또 하나의 초대질량 블랙홀을 만들어내면 그 중력이 시야를 은하 전체로 넓혀준다.' },
   ],
 };
 
-/** 레벨(+track)에 해당하는 단계 데이터 반환 — 공통(0~16)은 track 불필요 */
+// ============================================================
+// 트랙 종료 후 공통 구간 (+25 ~ +29) — 5개 트랙이 다시 합류.
+// 별 하나의 운명에서 시야가 은하 → 은하군 → 은하단 → 초은하단 → 우주로 확대된다.
+// track과 무관하게 동일하며, stageKey에서도 트랙 접두어 없이 숫자 키를 쓴다.
+// ============================================================
+const POST_TRACK_STAGES = [
+  { level: 25, name: '우리 은하', subname: '은하수 · Milky Way', type: '막대나선은하',
+    cost: { type: 'item', key: ITEM_KEYS.STELLAR_WIND, amount: 15 }, successRate: 0.35, sellPrice: 1000000000, protectionCost: 23,
+    drop: null,
+    codexDescription: '【지름: 약 10만 광년 / 별의 수: 약 1,000억~4,000억 개】 태양계가 속한 막대나선은하. 당신의 별은 이제 은하 원반을 도는 수천억 개의 별들 중 하나로 자리잡는다.' },
+  { level: 26, name: '국부 은하군', subname: 'Local Group', type: '은하군',
+    cost: { type: 'hydrogen', amount: 5000000 }, successRate: 0.50, sellPrice: 4500000000, protectionCost: -1,
+    drop: null,
+    codexDescription: '【지름: 약 1,000만 광년 / 은하 수: 80개 이상】 우리은하와 안드로메다은하를 중심으로 묶인 은하 무리. 두 거대 은하는 약 45억 년 후 충돌해 하나로 합쳐질 것으로 예측된다.' },
+  { level: 27, name: '처녀자리 은하단', subname: 'Virgo Cluster', type: '은하단',
+    cost: { type: 'item', key: ITEM_KEYS.DARK_MATTER, amount: 2 }, successRate: 0.40, sellPrice: 6000000000, protectionCost: -1,
+    drop: null,
+    codexDescription: '【거리: 약 5,400만 광년 / 은하 수: 약 1,300~2,000개】 국부 은하군이 속한 라니아케아 초은하단의 중력 중심 역할을 하는 거대 은하단. 처녀자리 방향에 위치한다.' },
+  { level: 28, name: '라니아케아 초은하단', subname: 'Laniakea', type: '초은하단',
+    cost: { type: 'hydrogen', amount: 0 }, successRate: 0.15, sellPrice: null, protectionCost: -1,
+    drop: null,
+    codexDescription: '【지름: 약 5억 2천만 광년 / 은하 수: 약 10만 개】 2014년 처음 경계가 규정된 초은하단. "measureless heaven"을 뜻하는 하와이어에서 이름을 땄으며, 우리은하를 포함한 모든 이웃 은하가 이 중력 유역 안에 속한다.' },
+  { level: 29, name: '우주', subname: '관측가능한 우주', type: '궁극의 종착점',
+    cost: null, successRate: null, sellPrice: null, protectionCost: null, drop: null,
+    codexDescription: '【지름: 약 930억 광년 (관측가능)】 인류가 관측할 수 있는 모든 것의 총합. 하나의 별에서 시작해 은하, 은하군, 은하단, 초은하단을 거쳐 마침내 우주 그 자체에 도달했다 — 별 강화하기의 궁극적 엔딩.' },
+];
+
+/** 레벨(+track)에 해당하는 단계 데이터 반환 — 공통(0~16, 25~29)은 track 불필요 */
 function resolveStage(level, track) {
   if (level == null) return null;
   if (level <= 16) return COMMON_STAGES[level];
-  const t = TRACKS[track];
-  return t ? t[level - 17] : null;
+  if (level <= 24) {
+    const t = TRACKS[track];
+    return t ? t[level - 17] : null;
+  }
+  return POST_TRACK_STAGES[level - 25] || null;
 }
 
-/** storedStars/unlockedCodex에 쓰는 문자열 키 — 공통은 "7", 트랙 구간은 "track3_20" */
+/** storedStars/unlockedCodex에 쓰는 문자열 키 — 공통(0~16, 25~29)은 "7", 트랙 구간(17~24)은 "track3_20" */
 function stageKey(level, track) {
-  return level <= 16 ? String(level) : `${track}_${level}`;
+  return (level <= 16 || level >= 25) ? String(level) : `${track}_${level}`;
 }
 
 /** stageKey의 역변환 — "track3_20" → {level:20, track:'track3'}, "7" → {level:7, track:null} */

@@ -87,7 +87,7 @@ function formatNumber(n) {
 // ─── 별 이미지 경로 (공통은 star_N.png, 트랙 구간은 star_trackX_N.png) ──
 
 function starImagePath(level, track) {
-  return level <= 16 ? `images/star_${level}.png` : `images/star_${track}_${level}.png`;
+  return (level <= 16 || level >= 25) ? `images/star_${level}.png` : `images/star_${track}_${level}.png`;
 }
 
 // ─── 별 타입 → CSS 클래스 ────────────────────────────────────

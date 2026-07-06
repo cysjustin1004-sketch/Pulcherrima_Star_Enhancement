@@ -4,7 +4,7 @@
       ".read": true,
       ".write": false,
 
-      ".indexOn": ["bestStar"],
+      ".indexOn": ["bestStar", "battleWins"],
 
       "$uid": {
         ".read": true,
@@ -17,6 +17,36 @@
         ".read": true,
         ".write": false
       }
+    },
+
+    "friends": {
+      ".read": false,
+      ".write": false
+    },
+
+    "friendRequests": {
+      ".read": false,
+      ".write": false
+    },
+
+    "messages": {
+      ".read": false,
+      ".write": false
+    },
+
+    "messageIndex": {
+      ".read": false,
+      ".write": false
+    },
+
+    "battleLogs": {
+      ".read": false,
+      ".write": false
+    },
+
+    "battleCounters": {
+      ".read": false,
+      ".write": false
     },
 
     "authSecrets": {

@@ -33,7 +33,7 @@ module.exports = async (req, res) => {
     currentStar: 0,
     bestStar: 0,
     protectionScrolls: 0,
-    unlockedCodex: [0],
+    unlockedCodex: ['0'],
     items: {
       stellar_wind: 0, hypergiant_core: 0, supernova_glow: 0,
       neutron_crust: 0, pulsar_signal: 0, magnetar_flare: 0,

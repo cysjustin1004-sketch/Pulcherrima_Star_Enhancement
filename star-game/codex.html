@@ -126,7 +126,8 @@ async function renderCodex() {
   const user = await loadCurrentUser();
   if (!user) { clearSession(); location.href = 'login.html'; return; }
 
-  const unlocked = user.unlockedCodex || [];
+  // 과거 데이터에 숫자 0(레거시 unlockedCodex:[0])이 섞여 있어도 해금 처리되도록 문자열로 정규화
+  const unlocked = (user.unlockedCodex || []).map(String);
   document.getElementById('unlock-count').textContent =
     `해금: ${unlocked.length} / ${TOTAL_ENTRIES}`;
 

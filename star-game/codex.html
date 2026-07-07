@@ -59,8 +59,8 @@
   <a class="nav-item" href="messages.html">
     <span class="nav-icon">💬</span>메시지
   </a>
-  <a class="nav-item" href="#" id="nav-logout">
-    <span class="nav-icon">🚪</span>로그아웃
+  <a class="nav-item" href="battle.html">
+    <span class="nav-icon">⚔</span>배틀
   </a>
 </nav>
 
@@ -160,11 +160,6 @@ async function renderCodex() {
     tracksEl.appendChild(section);
   });
 }
-
-document.getElementById('nav-logout').addEventListener('click', e => {
-  e.preventDefault();
-  if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
-});
 
 (async () => { await renderCodex(); })();
 </script>

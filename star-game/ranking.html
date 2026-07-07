@@ -27,6 +27,22 @@
   </div>
 </div>
 
+<!-- ───────────────── 상대 프로필 모달 ───────────────── -->
+<div class="codex-modal-bg" id="profile-modal-bg">
+  <div class="codex-modal">
+    <div class="codex-modal-level" id="profile-star-level"></div>
+    <div class="codex-modal-name" id="profile-nickname"></div>
+    <div class="codex-modal-sub" id="profile-star-name"></div>
+    <div class="star-visual" style="margin:1rem auto;">
+      <img class="star-img" id="profile-star-img" src="" alt="">
+    </div>
+    <div class="codex-modal-desc" id="profile-record" style="text-align:center;"></div>
+    <div id="profile-battle-note" style="text-align:center; font-size:0.82rem; color:var(--text-sub); display:none;">친구만 배틀할 수 있습니다.</div>
+    <button class="btn-primary mt-1" id="btn-goto-battle">⚔ 배틀하러 가기</button>
+    <button class="btn-secondary w-100 mt-05" id="profile-modal-close">닫기</button>
+  </div>
+</div>
+
 <!-- 하단 네비게이션 -->
 <nav class="bottom-nav">
   <a class="nav-item" href="index.html">
@@ -41,8 +57,8 @@
   <a class="nav-item" href="messages.html">
     <span class="nav-icon">💬</span>메시지
   </a>
-  <a class="nav-item" href="#" id="nav-logout">
-    <span class="nav-icon">🚪</span>로그아웃
+  <a class="nav-item" href="battle.html">
+    <span class="nav-icon">⚔</span>배틀
   </a>
 </nav>
 
@@ -84,6 +100,7 @@ async function renderRanking(mode) {
     if (d.banned) return;  // 벤 유저는 랭킹에서 제외
     if (d.isCheat) return; // 테스트/치트 계정은 랭킹에서 제외
     users.push({
+      userKey:    child.key,
       nickname:   d.nickname,
       bestStar:   d.bestStar   || 0,
       bestTrack:  d.bestTrack  || null,
@@ -104,6 +121,7 @@ async function renderRanking(mode) {
 
     const item = document.createElement('div');
     item.className = 'rank-item';
+    item.style.cursor = 'pointer';
 
     if (mode === 'battle') {
       item.innerHTML = `
@@ -131,6 +149,8 @@ async function renderRanking(mode) {
       item.style.borderColor = 'var(--accent)';
     }
 
+    item.addEventListener('click', () => openRankProfile(u.userKey));
+
     list.appendChild(item);
   });
 
@@ -141,6 +161,47 @@ async function renderRanking(mode) {
 
 function escapeHtml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ─── 상대 프로필 모달 ─────────────────────────────────
+
+async function openRankProfile(userKey) {
+  if (!userKey) return;
+  const res = await apiCall('/api/battle/profile', { opponentKey: userKey });
+  if (!res.ok) { showToast(res.error || '프로필을 불러오지 못했습니다.'); return; }
+
+  const stage = resolveStage(res.currentStar, res.track) || COMMON_STAGES[0];
+  document.getElementById('profile-star-level').textContent = `+${res.currentStar}강`;
+  document.getElementById('profile-nickname').textContent = res.nickname;
+  document.getElementById('profile-star-name').textContent = stage.name;
+  document.getElementById('profile-star-img').src = starImagePath(res.currentStar, res.track);
+  document.getElementById('profile-record').textContent = `배틀 전적 ${res.battleWins}승 ${res.battleLosses}패`;
+
+  const goBtn = document.getElementById('btn-goto-battle');
+  const note  = document.getElementById('profile-battle-note');
+  if (res.isFriend) {
+    goBtn.style.display = '';
+    note.style.display  = 'none';
+    goBtn.onclick = () => { location.href = `battle.html?with=${encodeURIComponent(userKey)}`; };
+  } else {
+    goBtn.style.display = 'none';
+    note.style.display  = '';
+  }
+
+  document.getElementById('profile-modal-bg').classList.add('visible');
+}
+
+document.getElementById('profile-modal-close').addEventListener('click', () => {
+  document.getElementById('profile-modal-bg').classList.remove('visible');
+});
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 2200);
 }
 
 document.getElementById('tab-enhance').addEventListener('click', () => {
@@ -157,11 +218,6 @@ document.getElementById('tab-battle').addEventListener('click', () => {
   document.getElementById('tab-battle').classList.add('active');
   document.getElementById('tab-enhance').classList.remove('active');
   renderRanking(currentMode);
-});
-
-document.getElementById('nav-logout').addEventListener('click', e => {
-  e.preventDefault();
-  if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
 });
 
 (async () => { await renderRanking(currentMode); })();

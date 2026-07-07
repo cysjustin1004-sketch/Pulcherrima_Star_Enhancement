@@ -221,14 +221,32 @@ input::placeholder { color: #9a9a9a; }
 .top-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
+  justify-content: space-between;
   padding: 1rem 1rem 0.85rem;
   border-bottom: var(--border-w) solid var(--border);
   background: var(--bg2);
   max-width: 480px;
   margin: 0 auto;
 }
+
+.top-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.top-header-logout {
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: var(--text-sub);
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.3rem 0.4rem;
+  cursor: pointer;
+}
+.top-header-logout:hover { color: var(--text); }
 
 .top-header-logo {
   width: 32px;

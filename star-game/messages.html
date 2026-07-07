@@ -36,6 +36,7 @@
   <div class="chat-header">
     <button class="chat-back" id="btn-chat-back">←</button>
     <div class="chat-header-name" id="chat-header-name" style="cursor:pointer;">닉네임</div>
+    <button class="btn-secondary" id="btn-chat-profile" style="width:auto; margin-left:auto;">프로필</button>
   </div>
   <div class="chat-messages" id="chat-messages"></div>
 </div>
@@ -74,8 +75,8 @@
   <a class="nav-item active" href="messages.html">
     <span class="nav-icon">💬</span>메시지
   </a>
-  <a class="nav-item" href="#" id="nav-logout">
-    <span class="nav-icon">🚪</span>로그아웃
+  <a class="nav-item" href="battle.html">
+    <span class="nav-icon">⚔</span>배틀
   </a>
 </nav>
 
@@ -299,8 +300,7 @@ async function sendChat() {
 
 // ─── 상대 프로필 모달 ─────────────────────────────────
 
-document.getElementById('chat-header-name').addEventListener('click', async () => {
-  const key = document.getElementById('chat-header-name').dataset.key;
+async function openProfile(key) {
   if (!key) return;
   const res = await apiCall('/api/battle/profile', { opponentKey: key });
   if (!res.ok) { showToast(res.error || '프로필을 불러오지 못했습니다.'); return; }
@@ -315,6 +315,13 @@ document.getElementById('chat-header-name').addEventListener('click', async () =
     location.href = `battle.html?with=${encodeURIComponent(key)}`;
   };
   document.getElementById('profile-modal-bg').classList.add('visible');
+}
+
+document.getElementById('chat-header-name').addEventListener('click', () => {
+  openProfile(document.getElementById('chat-header-name').dataset.key);
+});
+document.getElementById('btn-chat-profile').addEventListener('click', () => {
+  openProfile(document.getElementById('chat-header-name').dataset.key);
 });
 
 document.getElementById('profile-modal-close').addEventListener('click', () => {
@@ -331,13 +338,6 @@ function showToast(msg) {
   requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
   setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 2200);
 }
-
-// ─── 로그아웃 ─────────────────────────────────────────
-
-document.getElementById('nav-logout').addEventListener('click', e => {
-  e.preventDefault();
-  if (confirm('로그아웃하시겠습니까?')) { clearSession(); location.href = 'login.html'; }
-});
 
 // ─── 초기 로드 (?with=<key> 로 바로 대화창 열기 지원) ─────
 

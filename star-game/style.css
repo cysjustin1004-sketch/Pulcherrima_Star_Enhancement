@@ -697,12 +697,16 @@ input::placeholder { color: #9a9a9a; }
   border: 2px solid var(--border);
   padding: 0.3rem 0.85rem;
   font-size: 0.82rem;
+  font-weight: 700;
   display: flex;
   align-items: center;
   gap: 0.4rem;
+  box-shadow: var(--shadow-sm);
 }
+.item-chip:active:not(:disabled) { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--border); }
 .item-chip .item-count { color: var(--text); font-weight: 900; }
 .item-chip.warn { border-color: var(--danger); color: var(--danger); }
+.item-chip.selected { background: var(--text); color: #fff; }
 
 /* 인벤토리 섹션 / 슬롯 그리드 (조합소 페이지) */
 .inv-section { margin-bottom: 1.25rem; }
@@ -798,6 +802,16 @@ input::placeholder { color: #9a9a9a; }
   color: var(--text-sub);
   text-align: center;
   padding: 1rem 0;
+}
+
+/* 보관된 별 — 강화 재료 안내가 붙으면 정사각형을 넘어 세로로 늘어날 수 있음 */
+#stored-stars-list .item-slot { aspect-ratio: auto; padding-bottom: 0.5rem; }
+#stored-stars-list .item-slot.material { border-color: var(--accent); }
+.material-usage-note {
+  font-size: 0.56rem;
+  line-height: 1.25;
+  color: var(--text-sub);
+  margin-top: 2px;
 }
 
 /* ─── 관리자 ─── */

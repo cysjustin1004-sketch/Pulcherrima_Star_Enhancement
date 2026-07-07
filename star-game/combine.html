@@ -143,13 +143,15 @@ function renderAll(user) {
     storedEntries.forEach(([key, cnt]) => {
       const { level, track } = parseStageKey(key);
       const stage = resolveStage(level, track);
+      const usage = starMaterialUsage(level, track);
       const slot = document.createElement('div');
-      slot.className = 'item-slot';
+      slot.className = 'item-slot' + (usage.length ? ' material' : '');
       slot.innerHTML = `
         <div class="item-slot-badge">+${level}</div>
         <img class="item-slot-img" src="${starImagePath(level, track)}" alt="">
         <div class="item-slot-name">${stage ? stage.name : '?'}</div>
         <div class="item-slot-count">${cnt}개</div>
+        ${usage.length ? `<div class="material-usage-note">${usage[0]} 재료</div>` : ''}
       `;
       starList.appendChild(slot);
     });

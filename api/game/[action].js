@@ -188,8 +188,8 @@ async function store(req, res) {
   const user = snap.val();
   const level = user.currentStar || 0;
 
-  if (level < 17) {
-    return res.status(400).json({ ok: false, error: '트랙 진입(+17강) 이후에만 보관할 수 있습니다.' });
+  if (level < 1) {
+    return res.status(400).json({ ok: false, error: '+1강 이상만 보관할 수 있습니다.' });
   }
 
   const key = stageKey(level, user.track);

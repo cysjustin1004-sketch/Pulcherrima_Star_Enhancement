@@ -81,6 +81,7 @@
     </div>
 
     <div class="star-type-badge" id="star-type-badge">성간 가스 구름</div>
+    <div id="star-material-note" style="display:none; font-size:0.75rem; color:var(--text-sub); margin-top:0.4rem; text-align:center;"></div>
   </div>
 
   <!-- 강화 정보 카드 -->
@@ -201,6 +202,16 @@ function updateUI(user) {
   const coreEl = document.getElementById('star-core');
   coreEl.src = starImagePath(level, user.track);
 
+  // 강화 재료 안내 (이 별이 상위 강화의 별 재료로 쓰이는 경우에만 표시)
+  const materialUsage = starMaterialUsage(level, user.track);
+  const materialNote = document.getElementById('star-material-note');
+  if (materialUsage.length) {
+    materialNote.textContent = `이 별은 ${materialUsage[0]} 강화 재료로 사용됩니다.`;
+    materialNote.style.display = '';
+  } else {
+    materialNote.style.display = 'none';
+  }
+
   // 강화 정보
   if (stage.cost === null) {
     // 트랙 최종 단계: 전설 달성, 강화 불가
@@ -252,9 +263,9 @@ function updateUI(user) {
     protText.style.color = 'var(--text-sub)';
   }
 
-  // 별 보관 버튼 (트랙 진입, 17강 이상에서만 보관 가능)
+  // 별 보관 버튼 (+1강 이상이면 보관 가능)
   const btnStore = document.getElementById('btn-store');
-  btnStore.style.display = level >= 17 ? '' : 'none';
+  btnStore.style.display = level >= 1 ? '' : 'none';
 
   // 액션 행: 0강=아이템창+상점 / 1강+=조합소+판매
   const btnLeft  = document.getElementById('btn-left');
@@ -484,7 +495,7 @@ async function handleSell() {
 document.getElementById('btn-store').addEventListener('click', async () => {
   if (!currentUser) return;
   const level = currentUser.currentStar;
-  if (level < 17) return;
+  if (level < 1) return;
 
   const stage = resolveStage(level, currentUser.track);
   if (!confirm(`+${level}강 별(${stage.name})을 보관하시겠습니까?\n보관된 별은 조합소에서 사용할 수 있습니다.`)) return;
@@ -538,10 +549,27 @@ async function reload() {
   updateUI(user);
 }
 
+// ─── 배틀 결과 알림 (방어자로서 놓친 결과를 홈 진입 시 순차 토스트로 표시) ───
+
+async function showBattleNotifications() {
+  const res = await apiCall('/api/battle/notifications', {});
+  if (!res.ok || !res.items || !res.items.length) return;
+
+  for (const n of res.items) {
+    const win = n.result === 'win';
+    const msg = win
+      ? `${n.opponentNick}님과의 배틀에서 승리! 수소 +${formatNumber(n.hydrogenDelta)}`
+      : `${n.opponentNick}님에게 배틀에서 패배… 수소 -${formatNumber(-n.hydrogenDelta)}`;
+    showToast(msg);
+    await new Promise(r => setTimeout(r, 2400)); // 토스트가 겹치지 않게 순차 표시
+  }
+}
+
 // ─── 초기 로드 ──────────────────────────────────────
 
 (async () => {
   await reload();
+  showBattleNotifications(); // 강화 흐름을 막지 않도록 결과를 기다리지 않음
 })();
 </script>
 </body>

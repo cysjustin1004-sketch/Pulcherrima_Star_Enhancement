@@ -1,9 +1,22 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { resolveStage, battleWinProb, BATTLE_STAKE_RATE, BATTLE_DAILY_CAP } = require('../../lib/game-config');
+const { resolveStage, battleWinProb, BATTLE_STAKE_RATE, BATTLE_DAILY_CAP, parseStageKey } = require('../../lib/game-config');
 
 function todayUTCBucket() {
   return new Date().toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
+}
+
+/**
+ * 배틀에 실제로 사용할 별(레벨·트랙) 결정.
+ * battleStarKey로 보관 별을 지정해뒀으면 그 별을, 아니면 현재 장비 중인 별을 사용.
+ * 배틀은 별을 소모하지 않으므로 공격/방어 모두 이 값 하나로 동일하게 계산한다.
+ */
+function battleStarOf(user) {
+  const key = user.battleStarKey;
+  if (key && user.storedStars && (user.storedStars[key] || 0) > 0) {
+    return parseStageKey(key);
+  }
+  return { level: user.currentStar || 0, track: user.track || null };
 }
 
 async function preview(req, res) {
@@ -29,26 +42,29 @@ async function preview(req, res) {
   const opp = oppSnap.val();
   if (opp.banned) return res.status(403).json({ ok: false, error: '정지된 사용자입니다.' });
 
-  const winProb = battleWinProb(me.currentStar || 0, opp.currentStar || 0);
+  const myBattle  = battleStarOf(me);
+  const oppBattle = battleStarOf(opp);
+
+  const winProb = battleWinProb(myBattle.level, oppBattle.level);
 
   const counterSnap = await db.ref(`battleCounters/${userKey}/${opponentKey}/${todayUTCBucket()}`).get();
   const usedToday = counterSnap.exists() ? counterSnap.val() : 0;
   const remainingToday = Math.max(0, BATTLE_DAILY_CAP - usedToday);
 
-  const myStage  = resolveStage(me.currentStar || 0, me.track);
-  const oppStage = resolveStage(opp.currentStar || 0, opp.track);
+  const myStage  = resolveStage(myBattle.level, myBattle.track);
+  const oppStage = resolveStage(oppBattle.level, oppBattle.track);
 
   res.json({
     ok: true,
     me: {
-      currentStar: me.currentStar || 0,
-      track: me.track || null,
+      currentStar: myBattle.level,
+      track: myBattle.track,
       stageName: myStage ? myStage.name : '-',
     },
     opponent: {
       nickname: opp.nickname,
-      currentStar: opp.currentStar || 0,
-      track: opp.track || null,
+      currentStar: oppBattle.level,
+      track: oppBattle.track,
       stageName: oppStage ? oppStage.name : '-',
       battleWins: opp.battleWins || 0,
       battleLosses: opp.battleLosses || 0,
@@ -98,7 +114,10 @@ async function execute(req, res) {
   const me  = meSnap2.val();
   const opp = oppSnap2.val();
 
-  const winProb = battleWinProb(me.currentStar || 0, opp.currentStar || 0);
+  const myBattle  = battleStarOf(me);
+  const oppBattle = battleStarOf(opp);
+
+  const winProb = battleWinProb(myBattle.level, oppBattle.level);
   const roll = Math.random();
   const win = roll < winProb;
 
@@ -134,15 +153,18 @@ async function execute(req, res) {
 
   const at = Date.now();
   await Promise.all([
+    // 공격자 항목 — 실행 응답으로 결과를 즉시 받으므로 seen:true (알림 불필요)
     db.ref(`battleLogs/${userKey}`).push({
       opponent: opponentKey, opponentNick: opp.nickname, role: 'attacker',
-      myLevel: me.currentStar || 0, oppLevel: opp.currentStar || 0,
-      winProb, result: win ? 'win' : 'loss', hydrogenDelta, at,
+      myLevel: myBattle.level, oppLevel: oppBattle.level,
+      winProb, result: win ? 'win' : 'loss', hydrogenDelta, at, seen: true,
     }),
+    // 방어자 항목 — 방어자는 배틀 순간 접속 중이 아닐 수 있으므로 seen:false
+    // (notifications 액션이 홈 로드 시 이 값을 읽어 토스트로 보여주고 소비함)
     db.ref(`battleLogs/${opponentKey}`).push({
       opponent: userKey, opponentNick: me.nickname, role: 'defender',
-      myLevel: opp.currentStar || 0, oppLevel: me.currentStar || 0,
-      winProb: 1 - winProb, result: win ? 'loss' : 'win', hydrogenDelta: -hydrogenDelta, at,
+      myLevel: oppBattle.level, oppLevel: myBattle.level,
+      winProb: 1 - winProb, result: win ? 'loss' : 'win', hydrogenDelta: -hydrogenDelta, at, seen: false,
     }),
   ]);
 
@@ -204,7 +226,53 @@ async function profile(req, res) {
   });
 }
 
-const ROUTES = { preview, execute, history, profile };
+async function setStar(req, res) {
+  const userKey = await validateSession(req);
+  if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  const { starKey } = req.body;
+
+  if (starKey == null) {
+    // 보관 별 지정 해제 — 현재 장비 중인 별로 폴백
+    await db.ref(`users/${userKey}/battleStarKey`).remove();
+    return res.json({ ok: true, battleStarKey: null });
+  }
+
+  const snap = await db.ref(`users/${userKey}/storedStars/${starKey}`).get();
+  const stored = snap.exists() ? snap.val() : 0;
+  if (!stored || stored <= 0) {
+    return res.status(400).json({ ok: false, error: '보관 중인 별이 아닙니다.' });
+  }
+
+  await db.ref(`users/${userKey}/battleStarKey`).set(starKey);
+  res.json({ ok: true, battleStarKey: starKey });
+}
+
+async function notifications(req, res) {
+  const userKey = await validateSession(req);
+  if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  // battleLogs는 execute()에서 공격자·방어자 양쪽에 push됨.
+  // 방어자 항목만 seen:false로 남아있으므로 그것만 골라 알림으로 반환하고 소비(seen:true)한다.
+  const snap = await db.ref(`battleLogs/${userKey}`).limitToLast(30).get();
+  const items = [];
+  const upd = {};
+  if (snap.exists()) {
+    snap.forEach(child => {
+      const v = child.val();
+      if (v.role === 'defender' && v.seen === false) {
+        items.push({ opponentNick: v.opponentNick, result: v.result, hydrogenDelta: v.hydrogenDelta, at: v.at });
+        upd[`battleLogs/${userKey}/${child.key}/seen`] = true;
+      }
+    });
+  }
+  if (Object.keys(upd).length) await db.ref().update(upd);
+  items.sort((a, b) => a.at - b.at); // 오래된 순 — 홈 화면에서 순차 토스트로 표시
+
+  res.json({ ok: true, items });
+}
+
+const ROUTES = { preview, execute, history, profile, setStar, notifications };
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();

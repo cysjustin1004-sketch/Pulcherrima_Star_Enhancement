@@ -16,6 +16,14 @@
     친구 목록에서 상대를 골라 배틀하세요 (상대가 접속 중이 아니어도 가능)
   </div>
 
+  <!-- ───────────────── 내 배틀 별 선택 (공격·방어 공용) ───────────────── -->
+  <div class="card">
+    <div style="font-size:0.8rem; color:var(--text-sub); font-weight:700; margin-bottom:0.6rem;">
+      내 배틀 별 <span style="font-weight:400;">— 공격·방어에 동일하게 사용됩니다</span>
+    </div>
+    <div class="item-grid" id="my-battle-star-chips"></div>
+  </div>
+
   <div id="opponent-list">
     <div style="text-align:center; color:var(--text-sub); padding:2rem;">로딩 중...</div>
   </div>
@@ -96,6 +104,41 @@ let lastPreview = null;
 
 function escapeHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ─── 내 배틀 별 선택 (보관 별 중 하나 또는 현재 별) ──────────
+
+function renderMyBattleStars() {
+  const wrap = document.getElementById('my-battle-star-chips');
+  wrap.innerHTML = '';
+
+  const chips = [
+    { key: null, label: `현재 별 (+${myUser.currentStar || 0}강)` },
+  ];
+
+  const stored = myUser.storedStars || {};
+  Object.entries(stored).filter(([, cnt]) => cnt > 0).forEach(([key, cnt]) => {
+    const { level, track } = parseStageKey(key);
+    const stage = resolveStage(level, track);
+    chips.push({ key, label: `${stage ? stage.name : '?'} (+${level}강) ${cnt}개` });
+  });
+
+  const selectedKey = myUser.battleStarKey || null;
+  chips.forEach(c => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'item-chip' + (selectedKey === c.key ? ' selected' : '');
+    chip.textContent = c.label;
+    chip.addEventListener('click', () => selectBattleStar(c.key));
+    wrap.appendChild(chip);
+  });
+}
+
+async function selectBattleStar(starKey) {
+  const res = await apiCall('/api/battle/setStar', { starKey });
+  if (!res.ok) { showToast(res.error || '배틀 별 변경에 실패했습니다.'); return; }
+  myUser.battleStarKey = res.battleStarKey;
+  renderMyBattleStars();
 }
 
 // ─── 친구(배틀 상대) 목록 ─────────────────────────────
@@ -249,6 +292,7 @@ function showToast(msg) {
 
 (async () => {
   myUser = await loadCurrentUser();
+  renderMyBattleStars();
   await loadOpponents();
 
   const params = new URLSearchParams(location.search);

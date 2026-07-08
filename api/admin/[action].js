@@ -1,5 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const crypto = require('crypto');
+const { COMMON_STAGES, TRACKS, POST_TRACK_STAGES, stageKey } = require('../../lib/game-config');
 
 // 관리자 세션 토큰 검증 헬퍼
 async function validateAdmin(req) {
@@ -117,12 +118,55 @@ async function migrateSecrets(req, res) {
   res.json({ ok: true, migrated, totalUsers: Object.keys(users).length });
 }
 
+// 도감 전체 항목이 해금된 테스트용 계정을 생성(또는 기존 계정을 덮어써서 갱신)한다. QA/디자인 확인용.
+async function createCheatAccount(req, res) {
+  if (!await validateAdmin(req)) {
+    return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
+  }
+
+  const nickname = (req.body.nickname || 'cheat').trim();
+  const password = req.body.password || 'cheat1234';
+  const userKey = nickname.toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
+
+  const allKeys = [
+    ...COMMON_STAGES.map(s => stageKey(s.level, null)),
+    ...Object.entries(TRACKS).flatMap(([trackKey, stages]) => stages.map(s => stageKey(s.level, trackKey))),
+    ...POST_TRACK_STAGES.map(s => stageKey(s.level, null)),
+  ];
+
+  const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
+  await db.ref(`authSecrets/${userKey}`).set({ passwordHash });
+  await db.ref(`users/${userKey}`).set({
+    nickname,
+    isCheat: true,
+    hydrogen: 999999999999,
+    currentStar: 24,
+    track: 'track1',
+    bestStar: 24,
+    bestTrack: 'track1',
+    protectionScrolls: 99,
+    battleWins: 0,
+    battleLosses: 0,
+    unlockedCodex: allKeys,
+    items: {
+      stellar_wind: 999, hypergiant_core: 999, supernova_glow: 999,
+      neutron_crust: 999, pulsar_signal: 999, magnetar_flare: 999,
+      hawking_radiation: 999, dark_matter: 999,
+    },
+    storedStars: {},
+    createdAt: Date.now(),
+  });
+
+  res.json({ ok: true, nickname, password, userKey, totalUnlocked: allKeys.length });
+}
+
 const ROUTES = {
   'verify': verify,
   'give-hydrogen': giveHydrogen,
   'ban': ban,
   'wipe-users': wipeUsers,
   'migrate-secrets': migrateSecrets,
+  'create-cheat-account': createCheatAccount,
 };
 
 module.exports = async (req, res) => {

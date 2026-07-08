@@ -36,19 +36,12 @@ WIKI_PAGES = {
     14: "Magnetar",
     15: "Cygnus X-1",
     16: "HLX-1",
-    17: "Event Horizon Telescope",
-    18: "Sagittarius A*",
-    19: "TON 618",
-    20: "Centaurus A",
-    21: "3C 273",
-    22: "GRB 221009A",
-    23: "Hercules-Corona Borealis Great Wall",
-    24: "Void (astronomy)",
-    25: "Observable universe",
-    26: "Cosmic inflation",
-    27: "Cosmic microwave background",
-    28: "Planck epoch",
-    29: "Big Bang",
+    # 25~29 : 트랙 종료 후 공통 구간(우리 은하 → 우주) — track 무관, star_25.png~star_29.png
+    25: "Milky Way",
+    26: "Local Group",
+    27: "Virgo Cluster",
+    28: "Laniakea Supercluster",
+    29: "Observable universe",
 }
 
 HEADERS = {"User-Agent": "StarGameImageBot/1.0 (educational project)"}

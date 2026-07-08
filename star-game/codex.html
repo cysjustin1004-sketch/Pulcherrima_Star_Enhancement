@@ -43,6 +43,10 @@
 
   <!-- 트랙별 구간 -->
   <div id="codex-tracks"></div>
+
+  <!-- 트랙 종료 후 공통 엔딩 구간 -->
+  <div class="card-title" style="padding:1rem 0 0.5rem;">우주로 향하는 길 (+25 ~ +29)</div>
+  <div class="codex-grid" id="codex-grid-post"></div>
 </div>
 
 <!-- 하단 네비게이션 -->
@@ -74,7 +78,7 @@
 const session = requireAuth();
 if (!session) throw new Error('no session');
 
-const TOTAL_ENTRIES = COMMON_STAGES.length + Object.keys(TRACKS).length * TRACKS.track1.length;
+const TOTAL_ENTRIES = COMMON_STAGES.length + Object.keys(TRACKS).length * TRACKS.track1.length + POST_TRACK_STAGES.length;
 
 function handleModalBgClick(e) {
   // 배경(bg) 클릭 시만 닫기 — 모달 내부 클릭은 무시
@@ -125,7 +129,8 @@ async function renderCodex() {
   const user = await loadCurrentUser();
   if (!user) { clearSession(); location.href = 'login.html'; return; }
 
-  const unlocked = user.unlockedCodex || [];
+  // 과거 데이터에 숫자 0(레거시 unlockedCodex:[0])이 섞여 있어도 해금 처리되도록 문자열로 정규화
+  const unlocked = (user.unlockedCodex || []).map(String);
   document.getElementById('unlock-count').textContent =
     `해금: ${unlocked.length} / ${TOTAL_ENTRIES}`;
 
@@ -158,6 +163,14 @@ async function renderCodex() {
     section.appendChild(grid);
 
     tracksEl.appendChild(section);
+  });
+
+  // 공통 엔딩 구간 (+25 ~ +29) — 트랙 무관
+  const postGrid = document.getElementById('codex-grid-post');
+  postGrid.innerHTML = '';
+  POST_TRACK_STAGES.forEach(stage => {
+    const isUnlocked = unlocked.includes(stageKey(stage.level, null));
+    postGrid.appendChild(buildCodexItem(stage.level, null, stage, isUnlocked));
   });
 }
 

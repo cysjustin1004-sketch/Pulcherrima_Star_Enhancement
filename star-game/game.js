@@ -87,24 +87,25 @@ function formatNumber(n) {
 // ─── 별 이미지 경로 (공통은 star_N.png, 트랙 구간은 star_trackX_N.png) ──
 
 function starImagePath(level, track) {
-  return level <= 16 ? `images/star_${level}.png` : `images/star_${track}_${level}.png`;
+  return (level <= 16 || level >= 25) ? `images/star_${level}.png` : `images/star_${track}_${level}.png`;
 }
 
 // ─── 강화 재료 사용처 안내 ────────────────────────────────────
 
 /**
  * 이 레벨(+트랙)의 별이 상위 강화의 "별" 재료로 쓰이는 단계 이름 목록.
- * star-cost 단계는 각 트랙의 +21강·+23강뿐(재료는 +20강·+22강)이라 최대 1개.
+ * 트랙 구간(17~24) 전체를 훑어 star-cost가 이 레벨을 가리키는 단계를 찾는다
+ * (하드코딩하면 트랙 수치 조정 시 어긋나기 쉬워 동적으로 스캔).
  */
 function starMaterialUsage(level, track) {
   const out = [];
   if (!track) return out; // 공통 구간(0~16)은 별 재료로 쓰이지 않음
-  [21, 23].forEach(l => {
+  for (let l = 17; l <= 24; l++) {
     const st = resolveStage(l, track);
     if (st && st.cost && st.cost.type === 'star' && st.cost.level === level) {
       out.push(`+${l}강 ${st.name}`);
     }
-  });
+  }
   return out;
 }
 

@@ -67,7 +67,7 @@ async function register(req, res) {
     protectionScrolls: 0,
     battleWins: 0,
     battleLosses: 0,
-    unlockedCodex: [0],
+    unlockedCodex: ['0'],
     items: {
       stellar_wind: 0, hypergiant_core: 0, supernova_glow: 0,
       neutron_crust: 0, pulsar_signal: 0, magnetar_flare: 0,

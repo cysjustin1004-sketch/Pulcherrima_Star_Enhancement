@@ -157,9 +157,9 @@ function renderAll(user) {
         <div class="item-slot-name">${stage ? stage.name : '?'}</div>
         <div class="item-slot-count">${cnt}개</div>
         ${usage.length ? `<div class="material-usage-note">${usage[0]} 재료</div>` : ''}
-        <div class="item-slot-actions" style="display:flex; gap:0.3rem; margin-top:0.4rem;">
-          <button class="btn-secondary item-slot-load" style="flex:1; font-size:0.72rem; padding:0.35rem;">강화로 불러오기</button>
-          ${canSell ? `<button class="btn-secondary item-slot-sell" style="flex:1; font-size:0.72rem; padding:0.35rem;">${formatNumber(stage.sellPrice)} 판매</button>` : ''}
+        <div class="item-slot-actions" style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.4rem; width:100%;">
+          <button class="btn-secondary item-slot-load" style="width:100%; font-size:0.68rem; padding:0.3rem 0.2rem;">불러오기</button>
+          ${canSell ? `<button class="btn-secondary item-slot-sell" style="width:100%; font-size:0.68rem; padding:0.3rem 0.2rem;">판매 (${formatNumber(stage.sellPrice)})</button>` : ''}
         </div>
       `;
       slot.querySelector('.item-slot-load').addEventListener('click', () => handleLoadStored(key, stage));

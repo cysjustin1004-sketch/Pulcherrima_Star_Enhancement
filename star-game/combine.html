@@ -87,11 +87,14 @@ function showToast(msg) {
 function formatOutputDesc(output) {
   if (output.type === 'protection') return `붕괴 방지권 ${output.amount}개`;
   if (output.type === 'star') {
-    // trackRelative 레시피는 절대 레벨이 없으므로 17+N으로 먼저 계산, 항상 제작자 본인 트랙 기준으로 해석
+    // trackRelative 레시피는 절대 레벨이 없으므로 17+N으로 먼저 계산.
+    // 트랙은 조합할 때 서버가 무작위로 정하므로 미리보기에서는 특정 이름을 보여줄 수 없다.
     const level = output.trackRelative != null ? 17 + output.trackRelative : output.level;
-    const track = level >= 17 ? currentUser.track : null;
-    const stage = resolveStage(level, track);
-    const name  = stage ? stage.name : '내 트랙';
+    if (output.trackRelative != null) {
+      return `무작위 트랙(+${level}강) 별 1개`;
+    }
+    const stage = resolveStage(level, null);
+    const name  = stage ? stage.name : '';
     return `${name}(+${level}강) 별 1개`;
   }
   return '?';
@@ -221,8 +224,7 @@ async function handleCraft(recipe) {
     if (out.type === 'protection') {
       showToast(`붕괴 방지권 ${out.amount}개 획득!`);
     } else if (out.type === 'star') {
-      const track = out.level >= 17 ? currentUser.track : null;
-      const stage = resolveStage(out.level, track);
+      const stage = resolveStage(out.level, out.track);
       showToast(`${stage ? stage.name : `+${out.level}강`}(+${out.level}강) 별 1개 획득!`);
     }
     await reload();

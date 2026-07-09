@@ -434,14 +434,14 @@ const TRACKS = {
       cost: { type: 'star', level: 21, amount: 2 }, successRate: 0.27, sellPrice: 400000000, protectionCost: 20,
       drop: null,
       codexDescription: '【질량: 태양의 약 20,000배】 초기 우주에서 극초대질량 별의 붕괴로 만들어졌을 것으로 추정되는 중간질량 블랙홀. 이후 은하 중심 초대질량 블랙홀로 성장하는 씨앗 후보다.' },
-    { level: 23, name: '퀘이사', subname: '3C 273', type: '퀘이사',
+    { level: 23, name: '초대질량 블랙홀', subname: '궁수자리 A*', type: '초대질량 블랙홀',
       cost: { type: 'item', key: ITEM_KEYS.MAGNETAR_FLARE, amount: 12 }, successRate: 0.27, sellPrice: 550000000, protectionCost: 22,
       drop: null,
-      codexDescription: '【중심 블랙홀 질량: 태양의 약 9억 배 / 광도: 태양의 약 4조 배】 24억 광년 거리의 가장 밝은 퀘이사 중 하나. 1963년 최초로 확인되었으며 맨눈 한계에 가까울 정도로 밝다.' },
-    { level: 24, name: '초대질량 블랙홀', subname: '궁수자리 A*', type: '초대질량 블랙홀',
+      codexDescription: '【질량: 태양의 약 400만 배】 우리 은하 중심의 초대질량 블랙홀. 2022년 사건지평선망원경(EHT)이 두 번째 블랙홀 사진으로 공개했다. 여기서 더 많은 물질을 집어삼키면 강착원반이 밝게 타오르는 퀘이사로 변한다.' },
+    { level: 24, name: '퀘이사', subname: '3C 273', type: '퀘이사',
       cost: { type: 'star', level: 22, amount: 1 }, successRate: 0.25, sellPrice: 750000000, protectionCost: 23,
       drop: null,
-      codexDescription: '【질량: 태양의 약 400만 배】 우리 은하 중심의 초대질량 블랙홀. 2022년 사건지평선망원경(EHT)이 두 번째 블랙홀 사진으로 공개했다. 극초대질량 별 진화의 최종 종착지다. 또 하나의 초대질량 블랙홀을 만들어내면 그 중력이 시야를 은하 전체로 넓혀준다.' },
+      codexDescription: '【중심 블랙홀 질량: 태양의 약 9억 배 / 광도: 태양의 약 4조 배】 24억 광년 거리의 가장 밝은 퀘이사 중 하나. 1963년 최초로 확인되었으며 맨눈 한계에 가까울 정도로 밝다. 극초대질량 별 진화의 최종 종착지다. 또 하나의 퀘이사를 만들어내면 그 중력이 시야를 은하 전체로 넓혀준다.' },
   ],
 };
 

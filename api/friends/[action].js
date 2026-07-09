@@ -13,11 +13,10 @@ async function list(req, res) {
 
   const friendEntries = [];
   if (friendsSnap.exists()) {
-    friendsSnap.forEach(child => friendEntries.push({ userKey: child.key, meta: child.val() }));
+    // forEach 콜백이 truthy를 반환하면 Firebase가 순회를 중단시키므로,
+    // push()의 반환값(추가 후 배열 길이)이 암묵적으로 리턴되지 않도록 블록으로 감싼다.
+    friendsSnap.forEach(child => { friendEntries.push({ userKey: child.key, meta: child.val() }); });
   }
-  // TEMP DEBUG — 원인 파악 후 제거
-  const _debugRaw = friendsSnap.exists() ? friendsSnap.val() : null;
-  const _debugRawKeys = _debugRaw ? Object.keys(_debugRaw) : [];
 
   // 친구별 최신 장비 별/전적도 함께 내려줌 (배틀 상대 선택 화면에서 재조회 없이 사용)
   const friendUserSnaps = await Promise.all(
@@ -46,7 +45,7 @@ async function list(req, res) {
     });
   }
 
-  res.json({ ok: true, friends, incoming, _debugRawKeys, _debugRaw });
+  res.json({ ok: true, friends, incoming });
 }
 
 async function request(req, res) {

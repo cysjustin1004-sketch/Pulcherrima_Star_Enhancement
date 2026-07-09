@@ -189,7 +189,8 @@ async function history(req, res) {
   const snap = await db.ref(`battleLogs/${userKey}`).limitToLast(n).get();
   const logs = [];
   if (snap.exists()) {
-    snap.forEach(child => logs.push(child.val()));
+    // forEach 콜백이 truthy를 반환하면 순회가 중단되므로 push() 반환값이 새어나가지 않게 블록으로 감싼다.
+    snap.forEach(child => { logs.push(child.val()); });
   }
   logs.reverse(); // 최신순
 

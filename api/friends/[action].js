@@ -15,6 +15,9 @@ async function list(req, res) {
   if (friendsSnap.exists()) {
     friendsSnap.forEach(child => friendEntries.push({ userKey: child.key, meta: child.val() }));
   }
+  // TEMP DEBUG — 원인 파악 후 제거
+  const _debugRaw = friendsSnap.exists() ? friendsSnap.val() : null;
+  const _debugRawKeys = _debugRaw ? Object.keys(_debugRaw) : [];
 
   // 친구별 최신 장비 별/전적도 함께 내려줌 (배틀 상대 선택 화면에서 재조회 없이 사용)
   const friendUserSnaps = await Promise.all(
@@ -43,7 +46,7 @@ async function list(req, res) {
     });
   }
 
-  res.json({ ok: true, friends, incoming });
+  res.json({ ok: true, friends, incoming, _debugRawKeys, _debugRaw });
 }
 
 async function request(req, res) {

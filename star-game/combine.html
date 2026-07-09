@@ -87,9 +87,9 @@ function showToast(msg) {
 function formatOutputDesc(output) {
   if (output.type === 'protection') return `붕괴 방지권 ${output.amount}개`;
   if (output.type === 'star') {
-    // trackRelative 레시피는 절대 레벨이 없으므로 17+N으로 먼저 계산.
+    // trackRelative 레시피는 절대 레벨이 없으므로 14+N으로 먼저 계산.
     // 트랙은 조합할 때 서버가 무작위로 정하므로 미리보기에서는 특정 이름을 보여줄 수 없다.
-    const level = output.trackRelative != null ? 17 + output.trackRelative : output.level;
+    const level = output.trackRelative != null ? 14 + output.trackRelative : output.level;
     if (output.trackRelative != null) {
       return `무작위 트랙(+${level}강) 별 1개`;
     }

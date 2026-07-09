@@ -117,20 +117,20 @@ function formatKoreanNumber(n) {
 // ─── 별 이미지 경로 (공통은 star_N.png, 트랙 구간은 star_trackX_N.png) ──
 
 function starImagePath(level, track) {
-  return (level <= 16 || level >= 25) ? `images/star_${level}.png` : `images/star_${track}_${level}.png`;
+  return (level <= 13 || level >= 22) ? `images/star_${level}.png` : `images/star_${track}_${level}.png`;
 }
 
 // ─── 강화 재료 사용처 안내 ────────────────────────────────────
 
 /**
  * 이 레벨(+트랙)의 별이 상위 강화의 "별" 재료로 쓰이는 단계 이름 목록.
- * 트랙 구간(17~24) 전체를 훑어 star-cost가 이 레벨을 가리키는 단계를 찾는다
+ * 트랙 구간(14~21) 전체를 훑어 star-cost가 이 레벨을 가리키는 단계를 찾는다
  * (하드코딩하면 트랙 수치 조정 시 어긋나기 쉬워 동적으로 스캔).
  */
 function starMaterialUsage(level, track) {
   const out = [];
-  if (!track) return out; // 공통 구간(0~16)은 별 재료로 쓰이지 않음
-  for (let l = 17; l <= 24; l++) {
+  if (!track) return out; // 공통 구간(0~13)은 별 재료로 쓰이지 않음
+  for (let l = 14; l <= 21; l++) {
     const st = resolveStage(l, track);
     if (st && st.cost && st.cost.type === 'star' && st.cost.level === level) {
       out.push(`+${l}강 ${st.name}`);

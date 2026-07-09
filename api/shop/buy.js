@@ -1,6 +1,8 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { SHOP_ITEMS, stageKey } = require('../../lib/game-config');
+const { SHOP_ITEMS, stageKey, TRACK_INFO } = require('../../lib/game-config');
+
+const TRACK_KEYS = Object.keys(TRACK_INFO);
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
@@ -24,12 +26,17 @@ module.exports = async (req, res) => {
   upd[`users/${userKey}/hydrogen`] = (user.hydrogen || 0) - item.price;
 
   if (item.type === 'warp') {
-    // 도약권: currentStar를 해당 레벨로 설정
+    // 도약권: currentStar를 해당 레벨로 설정. 공통구간(0~13강)을 넘어서는 도약이면
+    // 강화로 13→14강을 넘을 때와 동일하게 트랙을 무작위로 새로 배정해야 한다.
+    let warpTrack = user.track || null;
+    if (item.targetLevel > 13) {
+      warpTrack = TRACK_KEYS[Math.floor(Math.random() * TRACK_KEYS.length)];
+      upd[`users/${userKey}/track`] = warpTrack;
+    }
     upd[`users/${userKey}/currentStar`] = item.targetLevel;
     const unlocked = user.unlockedCodex || [];
-    // 도약 경로의 모든 단계를 도감 해금 (도약권은 전부 공통 구간 내이므로 트랙 불필요)
     for (let lv = 1; lv <= item.targetLevel; lv++) {
-      const key = stageKey(lv, user.track);
+      const key = stageKey(lv, lv <= 13 ? null : warpTrack);
       if (!unlocked.includes(key)) unlocked.push(key);
     }
     upd[`users/${userKey}/unlockedCodex`] = unlocked;

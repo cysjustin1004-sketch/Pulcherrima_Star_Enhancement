@@ -70,9 +70,9 @@ async function enhance(req, res) {
   if (success) {
     const newLevel = level + 1;
 
-    // 공통 구간을 마치고(레벨16→17) 트랙 구간에 진입할 때마다 — 매번 트랙 무작위 재배정
+    // 공통 구간을 마치고(레벨13→14) 트랙 구간에 진입할 때마다 — 매번 트랙 무작위 재배정
     let newTrack = track;
-    if (level === 16) {
+    if (level === 13) {
       newTrack = TRACK_KEYS[Math.floor(Math.random() * TRACK_KEYS.length)];
       upd[`users/${userKey}/track`] = newTrack;
       assignedTrack = newTrack;
@@ -81,7 +81,7 @@ async function enhance(req, res) {
     upd[`users/${userKey}/currentStar`] = newLevel;
     if (newLevel > (user.bestStar || 0)) {
       upd[`users/${userKey}/bestStar`] = newLevel;
-      upd[`users/${userKey}/bestTrack`] = newLevel <= 16 ? null : newTrack;
+      upd[`users/${userKey}/bestTrack`] = newLevel <= 13 ? null : newTrack;
     }
     const unlockKey = stageKey(newLevel, newTrack);
     const unlocked = user.unlockedCodex || [];

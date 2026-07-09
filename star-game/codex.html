@@ -38,14 +38,14 @@
   </div>
 
   <!-- 공통 구간 -->
-  <div class="card-title" style="padding:0.25rem 0 0.5rem;">공통 (+0 ~ +16)</div>
+  <div class="card-title" style="padding:0.25rem 0 0.5rem;">공통 (+0 ~ +13)</div>
   <div class="codex-grid" id="codex-grid-common"></div>
 
   <!-- 트랙별 구간 -->
   <div id="codex-tracks"></div>
 
   <!-- 트랙 종료 후 공통 엔딩 구간 -->
-  <div class="card-title" style="padding:1rem 0 0.5rem;">우주로 향하는 길 (+25 ~ +29)</div>
+  <div class="card-title" style="padding:1rem 0 0.5rem;">우주로 향하는 길 (+22 ~ +29)</div>
   <div class="codex-grid" id="codex-grid-post"></div>
 </div>
 
@@ -151,7 +151,7 @@ async function renderCodex() {
     const title = document.createElement('div');
     title.className = 'card-title';
     title.style.cssText = 'padding:1rem 0 0.5rem;';
-    title.textContent = `${TRACK_INFO[trackKey].name} (+17 ~ +24)`;
+    title.textContent = `${TRACK_INFO[trackKey].name} (+14 ~ +21)`;
     section.appendChild(title);
 
     const grid = document.createElement('div');
@@ -165,7 +165,7 @@ async function renderCodex() {
     tracksEl.appendChild(section);
   });
 
-  // 공통 엔딩 구간 (+25 ~ +29) — 트랙 무관
+  // 공통 엔딩 구간 (+22 ~ +29) — 트랙 무관
   const postGrid = document.getElementById('codex-grid-post');
   postGrid.innerHTML = '';
   POST_TRACK_STAGES.forEach(stage => {

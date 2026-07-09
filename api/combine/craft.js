@@ -45,9 +45,9 @@ module.exports = async (req, res) => {
   if (out.type === 'protection') {
     upd[`users/${userKey}/protectionScrolls`] = (user.protectionScrolls || 0) + out.amount;
   } else if (out.type === 'star') {
-    // trackRelative: 절대 레벨이 없으므로 17+N으로 계산. 트랙은 제작자 본인 것이 아니라
-    // 5개 트랙 중 무작위로 배정 — 어느 트랙 별이 나올지는 조합해봐야 안다.
-    resolvedLevel = out.trackRelative != null ? 17 + out.trackRelative : out.level;
+    // trackRelative: 절대 레벨이 없으므로 14+N으로 계산(트랙은 14강부터 시작). 트랙은 제작자
+    // 본인 것이 아니라 5개 트랙 중 무작위로 배정 — 어느 트랙 별이 나올지는 조합해봐야 안다.
+    resolvedLevel = out.trackRelative != null ? 14 + out.trackRelative : out.level;
     resolvedTrack = out.trackRelative != null
       ? TRACK_KEYS[Math.floor(Math.random() * TRACK_KEYS.length)]
       : null;

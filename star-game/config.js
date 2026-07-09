@@ -567,8 +567,8 @@ const RECIPES = [
   {
     id: 'r5',
     inputs: [{ key: ITEM_KEYS.PULSAR_SIGNAL, amount: 2 }],
-    output: { type: 'star', trackRelative: 0 },
-    desc: '펄사 전파 신호 2개 → 무작위 트랙 +14강 별 1개',
+    output: { type: 'star', trackRelative: 2 },
+    desc: '펄사 전파 신호 2개 → 무작위 트랙 +16강 별 1개',
   },
   {
     id: 'r6',
@@ -579,8 +579,8 @@ const RECIPES = [
   {
     id: 'r7',
     inputs: [{ key: ITEM_KEYS.MAGNETAR_FLARE, amount: 4 }],
-    output: { type: 'star', trackRelative: 2 },
-    desc: '마그네타 섬광 4개 → 무작위 트랙 +16강 별 1개',
+    output: { type: 'star', trackRelative: 5 },
+    desc: '마그네타 섬광 4개 → 무작위 트랙 +19강 별 1개',
   },
   {
     id: 'r8',

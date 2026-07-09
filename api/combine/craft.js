@@ -1,6 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { RECIPES, ITEM_NAMES, stageKey } = require('../../lib/game-config');
+const { RECIPES, ITEM_NAMES, stageKey, INVENTORY_CAP } = require('../../lib/game-config');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
@@ -46,6 +46,11 @@ module.exports = async (req, res) => {
     resolvedLevel = out.trackRelative != null ? 17 + out.trackRelative : out.level;
     if (out.trackRelative != null && !user.track) {
       return res.status(400).json({ ok: false, error: '아직 트랙에 진입하지 않아 조합할 수 없습니다.' });
+    }
+    // 보관함이 가득 차 있으면 재료 소모 전에 막는다 (아직 upd는 DB에 쓰이지 않은 상태라 재료 낭비 없음)
+    const totalStored = Object.values(user.storedStars || {}).reduce((a, b) => a + b, 0);
+    if (totalStored >= INVENTORY_CAP) {
+      return res.status(400).json({ ok: false, error: `인벤토리가 가득 찼습니다 (${INVENTORY_CAP}/${INVENTORY_CAP}). 별을 정리한 뒤 다시 조합하세요.` });
     }
     // 별 보관함에 추가
     const key = stageKey(resolvedLevel, user.track);

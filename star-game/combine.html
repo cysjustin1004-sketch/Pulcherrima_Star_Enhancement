@@ -34,6 +34,7 @@
   <section class="inv-section">
     <div class="inv-section-head">
       <span class="inv-section-title">보관된 별</span>
+      <span class="inv-section-count" id="stored-stars-count">-</span>
     </div>
     <div class="item-slot-grid" id="stored-stars-list"></div>
   </section>
@@ -137,6 +138,9 @@ function renderAll(user) {
   starList.innerHTML = '';
   const stored = user.storedStars || {};
   const storedEntries = Object.entries(stored).filter(([, cnt]) => cnt > 0);
+  const totalStoredCount = storedEntries.reduce((sum, [, cnt]) => sum + cnt, 0);
+  document.getElementById('stored-stars-count').textContent = `${totalStoredCount} / ${INVENTORY_CAP}`;
+
   if (storedEntries.length === 0) {
     starList.innerHTML = '<div class="inv-empty-note">보관된 별이 없습니다.</div>';
   } else {
@@ -144,6 +148,7 @@ function renderAll(user) {
       const { level, track } = parseStageKey(key);
       const stage = resolveStage(level, track);
       const usage = starMaterialUsage(level, track);
+      const canSell = stage && stage.sellPrice;
       const slot = document.createElement('div');
       slot.className = 'item-slot' + (usage.length ? ' material' : '');
       slot.innerHTML = `
@@ -152,7 +157,15 @@ function renderAll(user) {
         <div class="item-slot-name">${stage ? stage.name : '?'}</div>
         <div class="item-slot-count">${cnt}개</div>
         ${usage.length ? `<div class="material-usage-note">${usage[0]} 재료</div>` : ''}
+        <div class="item-slot-actions" style="display:flex; gap:0.3rem; margin-top:0.4rem;">
+          <button class="btn-secondary item-slot-load" style="flex:1; font-size:0.72rem; padding:0.35rem;">강화로 불러오기</button>
+          ${canSell ? `<button class="btn-secondary item-slot-sell" style="flex:1; font-size:0.72rem; padding:0.35rem;">${formatNumber(stage.sellPrice)} 판매</button>` : ''}
+        </div>
       `;
+      slot.querySelector('.item-slot-load').addEventListener('click', () => handleLoadStored(key, stage));
+      if (canSell) {
+        slot.querySelector('.item-slot-sell').addEventListener('click', () => handleSellStored(key, stage));
+      }
       starList.appendChild(slot);
     });
   }
@@ -213,6 +226,26 @@ async function handleCraft(recipe) {
     await reload();
   } else {
     showToast(data.error || '조합 실패');
+  }
+}
+
+async function handleSellStored(key, stage) {
+  const result = await sellStoredStar(key);
+  if (result.ok) {
+    showToast(`${stage.name} 판매! 수소 ${formatNumber(result.gained)} 획득`);
+    await reload();
+  } else {
+    showToast(result.error || '판매 실패');
+  }
+}
+
+async function handleLoadStored(key, stage) {
+  const result = await loadStoredStar(key);
+  if (result.ok) {
+    // 강화 화면에서 바로 이어서 강화할 수 있도록 이동
+    location.href = 'index.html';
+  } else {
+    showToast(result.error || '불러오기 실패');
   }
 }
 

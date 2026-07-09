@@ -37,8 +37,7 @@ function checkCost(user, cost) {
   } else if (cost.type === 'star') {
     const stored = sumStoredStarAcrossTracks(user.storedStars, cost.level);
     if (stored < cost.amount) {
-      const stage = resolveStage(cost.level, user.track);
-      return { ok: false, error: `${stage ? stage.name : '?'}(+${cost.level}강) 별이 ${cost.amount}개 필요합니다.` };
+      return { ok: false, error: `+${cost.level}강 별이 ${cost.amount}개 필요합니다.` };
     }
   }
   return { ok: true };
@@ -80,6 +79,16 @@ async function sellStar() {
 
 async function storeStar() {
   return apiCall('/api/game/store', {});
+}
+
+// ─── 보관된 별 판매 / 강화 화면으로 불러오기 ────────────────────
+
+async function sellStoredStar(key) {
+  return apiCall('/api/game/sellStored', { key });
+}
+
+async function loadStoredStar(key) {
+  return apiCall('/api/game/load', { key });
 }
 
 // ─── 숫자 포맷 ───────────────────────────────────────────────

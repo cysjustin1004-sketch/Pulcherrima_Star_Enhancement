@@ -1,6 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { resolveStage, stageKey, ITEM_NAMES, TRACK_INFO } = require('../../lib/game-config');
+const { resolveStage, stageKey, parseStageKey, ITEM_NAMES, TRACK_INFO, INVENTORY_CAP } = require('../../lib/game-config');
 
 const TRACK_KEYS = Object.keys(TRACK_INFO);
 
@@ -199,6 +199,11 @@ async function store(req, res) {
     return res.status(400).json({ ok: false, error: '+1강 이상만 보관할 수 있습니다.' });
   }
 
+  const totalStored = Object.values(user.storedStars || {}).reduce((a, b) => a + b, 0);
+  if (totalStored >= INVENTORY_CAP) {
+    return res.status(400).json({ ok: false, error: `인벤토리가 가득 찼습니다 (${INVENTORY_CAP}/${INVENTORY_CAP}). 별을 판매하거나 정리해주세요.` });
+  }
+
   const key = stageKey(level, user.track);
   const stored = (user.storedStars && user.storedStars[key]) || 0;
   await db.ref().update({
@@ -209,7 +214,84 @@ async function store(req, res) {
   res.json({ ok: true, level });
 }
 
-const ROUTES = { enhance, protection, sell, store };
+async function sellStored(req, res) {
+  const userKey = await validateSession(req);
+  if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  const { key } = req.body;
+  if (!key) return res.status(400).json({ ok: false, error: '판매할 별을 지정하세요.' });
+
+  const snap = await db.ref(`users/${userKey}`).get();
+  if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+
+  const user = snap.val();
+  const stored = (user.storedStars && user.storedStars[key]) || 0;
+  if (stored < 1) {
+    return res.status(400).json({ ok: false, error: '보관된 별이 없습니다.' });
+  }
+
+  const { level, track } = parseStageKey(key);
+  const stage = resolveStage(level, track);
+  if (!stage || !stage.sellPrice) {
+    return res.status(400).json({ ok: false, error: '이 별은 판매할 수 없습니다.' });
+  }
+
+  await db.ref().update({
+    [`users/${userKey}/hydrogen`]:           (user.hydrogen || 0) + stage.sellPrice,
+    [`users/${userKey}/storedStars/${key}`]: stored - 1,
+  });
+
+  res.json({ ok: true, gained: stage.sellPrice, key });
+}
+
+async function load(req, res) {
+  const userKey = await validateSession(req);
+  if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  const { key } = req.body;
+  if (!key) return res.status(400).json({ ok: false, error: '불러올 별을 지정하세요.' });
+
+  const snap = await db.ref(`users/${userKey}`).get();
+  if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+
+  const user = snap.val();
+  const storedStars = { ...(user.storedStars || {}) };
+  const have = storedStars[key] || 0;
+  if (have < 1) {
+    return res.status(400).json({ ok: false, error: '보관된 별이 없습니다.' });
+  }
+
+  const { level: newLevel, track: newTrack } = parseStageKey(key);
+  const newStage = resolveStage(newLevel, newTrack);
+  if (!newStage) {
+    return res.status(400).json({ ok: false, error: '유효하지 않은 별입니다.' });
+  }
+
+  const curLevel = user.currentStar || 0;
+
+  // 강화 중이던 별이 있으면 자동으로 보관함에 넣는다(스왑) — 총 개수 변화가 없어 용량 체크 불필요
+  if (curLevel > 0) {
+    const curKey = stageKey(curLevel, user.track);
+    storedStars[curKey] = (storedStars[curKey] || 0) + 1;
+  }
+
+  // 불러오는 별은 보관함에서 차감
+  storedStars[key] = (storedStars[key] || 0) - 1;
+  if (storedStars[key] <= 0) delete storedStars[key];
+
+  const upd = {
+    [`users/${userKey}/storedStars`]: storedStars,
+    [`users/${userKey}/currentStar`]: newLevel,
+  };
+  // 공통/우주루트 별(track null)은 기존 트랙 유지, 트랙 별은 그 트랙으로 전환
+  if (newTrack) upd[`users/${userKey}/track`] = newTrack;
+
+  await db.ref().update(upd);
+
+  res.json({ ok: true, level: newLevel, track: newTrack, autoStored: curLevel > 0 });
+}
+
+const ROUTES = { enhance, protection, sell, store, sellStored, load };
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();

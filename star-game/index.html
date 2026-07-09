@@ -307,13 +307,12 @@ function formatCost(cost, user) {
     return `<span style="color:${color}">${ITEM_NAMES[cost.key]} ${cost.amount}개 (보유: ${held})</span>`;
   }
   if (cost.type === 'star') {
-    // 트랙 무관 — 어느 트랙에서 보관했든 레벨만 맞으면 재료로 인정
+    // 트랙 무관 — 어느 트랙에서 보관했든 레벨만 맞으면 재료로 인정되므로
+    // 특정 트랙 이름 대신 레벨로만 표시
     const stored  = sumStoredStarAcrossTracks(user.storedStars, cost.level);
     const enough  = stored >= cost.amount;
     const color   = enough ? 'var(--success)' : 'var(--danger)';
-    const stage   = resolveStage(cost.level, user.track);
-    const name    = stage ? stage.name : `+${cost.level}강 별`;
-    return `<span style="color:${color}">${name} ${cost.amount}개 (보유: ${stored})</span>`;
+    return `<span style="color:${color}">+${cost.level}강 별 ${cost.amount}개 (보유: ${stored})</span>`;
   }
   return '-';
 }

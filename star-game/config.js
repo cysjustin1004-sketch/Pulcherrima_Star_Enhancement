@@ -624,3 +624,6 @@ const RATE_LIMIT = { maxPerMinute: 50 };
 
 // 신규 유저 시작 수소
 const STARTING_HYDROGEN = 2000000;
+
+// 보관된 별(storedStars) 총 개수 상한 — 모든 트랙/레벨 합산
+const INVENTORY_CAP = 30;

@@ -161,7 +161,7 @@ function renderAll(user) {
         ${usage.length ? `<div class="material-usage-note">${usage[0]} 재료</div>` : ''}
         <div class="item-slot-actions" style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.4rem; width:100%;">
           <button class="btn-secondary item-slot-load" style="width:100%; font-size:0.68rem; padding:0.3rem 0.2rem;">불러오기</button>
-          ${canSell ? `<button class="btn-secondary item-slot-sell" style="width:100%; font-size:0.68rem; padding:0.3rem 0.2rem;">판매 (${formatNumber(stage.sellPrice)})</button>` : ''}
+          ${canSell ? `<button class="btn-secondary item-slot-sell" style="width:100%; font-size:0.68rem; padding:0.3rem 0.2rem;">판매 (${formatKoreanNumber(stage.sellPrice)})</button>` : ''}
         </div>
       `;
       slot.querySelector('.item-slot-load').addEventListener('click', () => handleLoadStored(key, stage));

@@ -774,6 +774,7 @@ input::placeholder { color: #9a9a9a; }
   font-weight: 700;
   line-height: 1.15;
   color: var(--text);
+  word-break: keep-all;
 }
 .item-slot-count {
   font-size: 0.7rem;
@@ -812,6 +813,7 @@ input::placeholder { color: #9a9a9a; }
   line-height: 1.25;
   color: var(--text-sub);
   margin-top: 2px;
+  word-break: keep-all;
 }
 
 /* ─── 관리자 ─── */

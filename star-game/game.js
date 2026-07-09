@@ -98,6 +98,22 @@ function formatNumber(n) {
   return n.toLocaleString();
 }
 
+/** 좁은 버튼 등에 쓰는 축약 표기 — 억/만 단위로 줄여서 자릿수 폭주를 막는다 */
+function formatKoreanNumber(n) {
+  if (n === null || n === undefined) return '-';
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  if (abs >= 100000000) {
+    const v = abs / 100000000;
+    return sign + (Number.isInteger(v) ? v : v.toFixed(1)) + '억';
+  }
+  if (abs >= 10000) {
+    const v = abs / 10000;
+    return sign + (Number.isInteger(v) ? v : v.toFixed(1)) + '만';
+  }
+  return sign + abs.toLocaleString();
+}
+
 // ─── 별 이미지 경로 (공통은 star_N.png, 트랙 구간은 star_trackX_N.png) ──
 
 function starImagePath(level, track) {

@@ -29,6 +29,11 @@
       ".write": false
     },
 
+    "friendRequestsSent": {
+      ".read": false,
+      ".write": false
+    },
+
     "messages": {
       ".read": false,
       ".write": false

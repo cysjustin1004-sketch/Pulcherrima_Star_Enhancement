@@ -127,9 +127,9 @@
     <!-- 별 보관 버튼 (보관 가능한 별에서만 표시) -->
     <button class="btn-outline" id="btn-store" style="display:none;">📦 별 보관하기</button>
 
-    <!-- 액션 행: 0강=아이템창+상점 / 1강+=조합소+판매하기 -->
+    <!-- 액션 행: 0강=인벤토리+상점 / 1강+=인벤토리+판매하기 -->
     <div class="action-row">
-      <button class="btn-secondary" id="btn-left"  onclick="location.href='combine.html'">조합소</button>
+      <button class="btn-secondary" id="btn-left"  onclick="location.href='combine.html'">인벤토리</button>
       <button class="btn-secondary" id="btn-right" onclick="location.href='shop.html'">상점</button>
     </div>
   </div>
@@ -267,10 +267,10 @@ function updateUI(user) {
   const btnStore = document.getElementById('btn-store');
   btnStore.style.display = level >= 1 ? '' : 'none';
 
-  // 왼쪽 버튼은 레벨과 무관하게 항상 조합소(아이템/보관별 확인 + 조합) — 이름을 통일해 혼란 방지
+  // 왼쪽 버튼은 레벨과 무관하게 항상 인벤토리(아이템/보관별 확인 + 조합) — 이름을 통일해 혼란 방지
   const btnLeft  = document.getElementById('btn-left');
   const btnRight = document.getElementById('btn-right');
-  btnLeft.textContent = '조합소';
+  btnLeft.textContent = '인벤토리';
   btnLeft.onclick     = () => location.href = 'combine.html';
   btnLeft.disabled    = false;
 
@@ -505,7 +505,7 @@ document.getElementById('btn-store').addEventListener('click', async () => {
   if (level < 1) return;
 
   const stage = resolveStage(level, currentUser.track);
-  if (!confirm(`+${level}강 별(${stage.name})을 보관하시겠습니까?\n보관된 별은 조합소에서 사용할 수 있습니다.`)) return;
+  if (!confirm(`+${level}강 별(${stage.name})을 보관하시겠습니까?\n보관된 별은 인벤토리에서 확인할 수 있습니다.`)) return;
 
   const result = await storeStar();
   if (result.ok) {

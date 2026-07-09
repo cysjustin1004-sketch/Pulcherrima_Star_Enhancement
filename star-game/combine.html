@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>조합소 — 별 강화하기</title>
+  <title>인벤토리 — 별 강화하기</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Sora:wght@700;900&family=Hanken+Grotesk:wght@400;500;700;900&family=Geist:wght@700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -16,7 +16,7 @@
       <path d="M12 2L14.4 9.2L22 12L14.4 14.8L12 22L9.6 14.8L2 12L9.6 9.2L12 2Z" fill="black"/>
     </svg>
   </div>
-  <div class="top-header-title">인벤토리 · 조합소</div>
+  <div class="top-header-title">인벤토리</div>
 </div>
 
 <div class="page">
@@ -87,10 +87,12 @@ function showToast(msg) {
 function formatOutputDesc(output) {
   if (output.type === 'protection') return `붕괴 방지권 ${output.amount}개`;
   if (output.type === 'star') {
-    // trackRelative 레시피는 항상 제작자 본인 트랙 기준으로 해석
-    const track = output.level >= 17 ? currentUser.track : null;
-    const stage = resolveStage(output.level, track);
-    return `${stage ? stage.name : ''}(+${output.level}강) 별 1개`;
+    // trackRelative 레시피는 절대 레벨이 없으므로 17+N으로 먼저 계산, 항상 제작자 본인 트랙 기준으로 해석
+    const level = output.trackRelative != null ? 17 + output.trackRelative : output.level;
+    const track = level >= 17 ? currentUser.track : null;
+    const stage = resolveStage(level, track);
+    const name  = stage ? stage.name : '내 트랙';
+    return `${name}(+${level}강) 별 1개`;
   }
   return '?';
 }

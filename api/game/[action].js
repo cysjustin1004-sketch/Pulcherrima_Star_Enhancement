@@ -32,9 +32,8 @@ async function enhance(req, res) {
     if (held < cost.amount)
       return res.status(400).json({ ok: false, error: `${ITEM_NAMES[cost.key]}이(가) ${cost.amount}개 필요합니다.` });
   } else if (cost.type === 'star') {
-    // 같은 트랙에 보관된 별을 소모 (공통 구간 레벨은 트랙 무관)
-    const key = stageKey(cost.level, track);
-    const stored = (user.storedStars && user.storedStars[key]) || 0;
+    // 트랙 무관하게 인정 — 트랙이 매번 랜덤 배정되므로 어느 트랙에서 보관했든 레벨만 맞으면 재료로 인정
+    const stored = TRACK_KEYS.reduce((sum, t) => sum + ((user.storedStars && user.storedStars[`${t}_${cost.level}`]) || 0), 0);
     if (stored < cost.amount)
       return res.status(400).json({ ok: false, error: `+${cost.level}강 별이 ${cost.amount}개 필요합니다.` });
   }
@@ -52,9 +51,17 @@ async function enhance(req, res) {
     const held = (user.items && user.items[cost.key]) || 0;
     upd[`users/${userKey}/items/${cost.key}`] = held - cost.amount;
   } else if (cost.type === 'star') {
-    const key = stageKey(cost.level, track);
-    const stored = (user.storedStars && user.storedStars[key]) || 0;
-    upd[`users/${userKey}/storedStars/${key}`] = stored - cost.amount;
+    // 여러 트랙에 나뉘어 보관돼 있을 수 있으므로 트랙 순서대로 필요한 만큼 차감
+    let remaining = cost.amount;
+    for (const t of TRACK_KEYS) {
+      if (remaining <= 0) break;
+      const k = `${t}_${cost.level}`;
+      const have = (user.storedStars && user.storedStars[k]) || 0;
+      if (have <= 0) continue;
+      const take = Math.min(have, remaining);
+      upd[`users/${userKey}/storedStars/${k}`] = have - take;
+      remaining -= take;
+    }
   }
 
   let drop = null;
@@ -63,9 +70,9 @@ async function enhance(req, res) {
   if (success) {
     const newLevel = level + 1;
 
-    // 공통 구간을 마치고(레벨16→17) 트랙 구간에 처음 진입하는 순간 — 트랙 무작위 배정
+    // 공통 구간을 마치고(레벨16→17) 트랙 구간에 진입할 때마다 — 매번 트랙 무작위 재배정
     let newTrack = track;
-    if (level === 16 && !track) {
+    if (level === 16) {
       newTrack = TRACK_KEYS[Math.floor(Math.random() * TRACK_KEYS.length)];
       upd[`users/${userKey}/track`] = newTrack;
       assignedTrack = newTrack;

@@ -21,6 +21,12 @@ async function apiCall(path, body) {
 
 // ─── 비용 사전 검증 (로컬, UI용) ────────────────────────────
 
+/** 트랙이 매번 랜덤 배정되므로, 별 재료는 트랙 무관하게 레벨만 맞으면 인정 */
+function sumStoredStarAcrossTracks(storedStars, level) {
+  if (!storedStars) return 0;
+  return Object.keys(TRACK_INFO).reduce((sum, t) => sum + (storedStars[`${t}_${level}`] || 0), 0);
+}
+
 function checkCost(user, cost) {
   if (!cost) return { ok: false, error: '강화할 수 없는 단계입니다.' };
   if (cost.type === 'hydrogen') {
@@ -29,8 +35,7 @@ function checkCost(user, cost) {
     const held = (user.items && user.items[cost.key]) || 0;
     if (held < cost.amount) return { ok: false, error: `${ITEM_NAMES[cost.key]}이(가) ${cost.amount}개 필요합니다.` };
   } else if (cost.type === 'star') {
-    const key = stageKey(cost.level, user.track);
-    const stored = (user.storedStars && user.storedStars[key]) || 0;
+    const stored = sumStoredStarAcrossTracks(user.storedStars, cost.level);
     if (stored < cost.amount) {
       const stage = resolveStage(cost.level, user.track);
       return { ok: false, error: `${stage ? stage.name : '?'}(+${cost.level}강) 별이 ${cost.amount}개 필요합니다.` };

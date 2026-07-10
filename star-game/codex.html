@@ -12,7 +12,7 @@
 
 <!-- 도감 상세 모달 -->
 <div class="codex-modal-bg" id="codex-modal-bg" onclick="handleModalBgClick(event)">
-  <div class="codex-modal">
+  <div class="codex-modal-frame">
     <button class="codex-modal-nav codex-modal-nav-prev" id="modal-nav-prev" aria-label="이전 단계" onclick="navigateEntry(-1)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 5L8 12L15 19" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
@@ -20,13 +20,15 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 5L16 12L9 19" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
 
-    <div class="codex-modal-level" id="modal-level">+0강</div>
-    <div style="margin: 0.75rem auto 0.75rem; text-align:center;" id="modal-star-visual"></div>
-    <div class="codex-modal-name" id="modal-name"></div>
-    <div class="codex-modal-sub"  id="modal-sub"></div>
-    <div class="codex-modal-desc" id="modal-desc"></div>
-    <button class="btn-secondary codex-modal-close" style="width:100%;"
-      onclick="document.getElementById('codex-modal-bg').classList.remove('visible')">닫기</button>
+    <div class="codex-modal">
+      <div class="codex-modal-level" id="modal-level">+0강</div>
+      <div style="margin: 0.75rem auto 0.75rem; text-align:center;" id="modal-star-visual"></div>
+      <div class="codex-modal-name" id="modal-name"></div>
+      <div class="codex-modal-sub"  id="modal-sub"></div>
+      <div class="codex-modal-desc" id="modal-desc"></div>
+      <button class="btn-secondary codex-modal-close" style="width:100%;"
+        onclick="document.getElementById('codex-modal-bg').classList.remove('visible')">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -34,7 +36,7 @@
 <div class="codex-modal-bg" id="codex-track-modal-bg" onclick="handleTrackModalBgClick(event)">
   <div class="codex-modal">
     <div class="codex-track-title">어떤 별의 종류로 이어갈까요?</div>
-    <div class="codex-track-desc">중심 수소가 고갈되는 순간, 별의 최초 질량에 따라 5가지 최후 중 하나가 정해집니다. 궁금한 트랙을 골라 도감을 계속 둘러보세요.</div>
+    <div class="codex-track-desc">별의 질량에 따라 5가지 운명 중 하나로 나뉩니다. 궁금한 트랙을 골라보세요.</div>
     <div class="codex-track-list" id="codex-track-list"></div>
   </div>
 </div>
@@ -55,7 +57,7 @@
 
   <div class="card-title" style="padding:0.25rem 0 0.5rem;">H-R도 — 별의 진화 지도</div>
   <div style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.75rem; line-height:1.55;">
-    실제 헤르츠스프룽-러셀도 위에 강화 단계 번호를 표시했습니다. 아래 범례에서 구간을 하나 고르면 그 구간의 진행 경로가 화살표로 표시돼요. 배지를 누르면 상세 설명이 뜨고, 좌우 화살표로 이전·다음 단계를 이어서 볼 수 있습니다. +13강(중심 수소 고갈)에서 다음으로 넘어가면 별의 종류를 고르게 됩니다.
+    실제 H-R도 위에서 별의 진화 경로를 확인해보세요. 구간을 고르고, 번호를 눌러보세요.
   </div>
 
   <div class="hr-wrap">
@@ -74,19 +76,19 @@
   <div class="hr-credit">H-R도: Richard Powell · <a href="https://commons.wikimedia.org/wiki/File:HRDiagram.png" target="_blank" rel="noopener">Atlas of the Universe</a> (CC BY-SA 2.5)</div>
 
   <div class="hr-legend" id="hr-legend"></div>
-  <div class="hr-legend-hint">구간을 하나 골라야 H-R도에 그 구간의 진행 경로가 표시됩니다.</div>
+  <div class="hr-legend-hint">구간을 선택해보세요.</div>
 
   <!-- 고전 H-R도 밖의 천체 (초신성 잔해 이후 — 중성자별, 블랙홀, 퀘이사 등) -->
   <div class="card-title" style="padding:1.25rem 0 0.5rem;">특이천체 및 그 너머</div>
   <div style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.6rem;">
-    별이 아니게 된 천체들 — 초신성 잔해·중성자별·블랙홀·퀘이사는 고전 H-R도 위에 놓을 자리가 없습니다.
+    별이 최후를 맞은 뒤 남은 천체들이에요.
   </div>
   <div class="hr-post-strip" id="hr-exotic-strip"></div>
 
   <!-- 트랙 종료 후 우주 루트 -->
   <div class="card-title" style="padding:1.25rem 0 0.5rem;">우주로 향하는 길 (+22 ~ +29)</div>
   <div style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.6rem;">
-    별 하나의 운명을 넘어 은하 → 은하군 → 초은하단 → 필라멘트 → 우주 거미줄 → 우주 전체로, 트랙과 무관하게 다시 합류합니다.
+    별 하나의 운명을 넘어, 우주 전체로 시야가 넓어집니다.
   </div>
   <div class="hr-post-strip" id="hr-post-strip"></div>
 </div>

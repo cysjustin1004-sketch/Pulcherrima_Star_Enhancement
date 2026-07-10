@@ -785,6 +785,11 @@ input::placeholder { color: #9a9a9a; }
 .codex-modal-nav-prev { left: -14px; }
 .codex-modal-nav-next { right: -14px; }
 .codex-modal-nav:disabled { opacity: 0.25; box-shadow: none; }
+/* 전역 button:active:not(:disabled)의 translate(4px,4px)를 그대로 두면 마우스로
+   누르는 동안 버튼이 커서 아래에서 벗어나 mouseup 시 클릭이 성립하지 않는다
+   (터치는 시작 지점 타깃을 유지해 우연히 문제없었음 — .hr-badge와 동일한 원인).
+   세로 중앙 정렬용 translateY(-50%)만 유지해서 밀림을 없앤다. */
+.codex-modal-nav:active:not(:disabled) { transform: translateY(-50%); }
 
 /* 트랙 선택창 */
 .codex-track-title { font-family: 'Sora', sans-serif; font-size: 1.05rem; font-weight: 900; color: var(--text); margin-bottom: 0.3rem; }
@@ -898,7 +903,6 @@ input::placeholder { color: #9a9a9a; }
 }
 .item-slot.warn { border-color: var(--danger); }
 
-.item-slot-icon { font-size: 1.4rem; line-height: 1; }
 .item-slot-img {
   width: 34px;
   height: 34px;

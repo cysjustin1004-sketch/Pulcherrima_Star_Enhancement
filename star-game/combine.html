@@ -100,18 +100,6 @@ function formatOutputDesc(output) {
   return '?';
 }
 
-// 아이템 종류별 대표 아이콘 (그림 리소스가 없어 문자로 대체)
-const ITEM_ICONS = {
-  [ITEM_KEYS.STELLAR_WIND]:    'W',
-  [ITEM_KEYS.HYPERGIANT_CORE]: 'C',
-  [ITEM_KEYS.SUPERNOVA_GLOW]:  'G',
-  [ITEM_KEYS.NEUTRON_CRUST]:   'N',
-  [ITEM_KEYS.PULSAR_SIGNAL]:   'P',
-  [ITEM_KEYS.MAGNETAR_FLARE]:  'M',
-  [ITEM_KEYS.HAWKING]:         'H',
-  [ITEM_KEYS.DARK_MATTER]:     'D',
-};
-
 function renderAll(user) {
   currentUser = user;
 
@@ -128,7 +116,6 @@ function renderAll(user) {
     slot.className = 'item-slot' + (count === 0 ? ' empty' : '') + (warning && count > 0 ? ' warn' : '');
     if (warning && count > 0) slot.title = warning;
     slot.innerHTML = `
-      <div class="item-slot-icon">${ITEM_ICONS[key] || '?'}</div>
       <div class="item-slot-name">${name}</div>
       <div class="item-slot-count">${count}개</div>
       ${warning && count > 0 ? '<div class="item-slot-warn">!</div>' : ''}

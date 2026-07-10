@@ -1,6 +1,8 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { RECIPES, ITEM_NAMES, stageKey } = require('../../lib/game-config');
+const { RECIPES, ITEM_NAMES, stageKey, INVENTORY_CAP, TRACK_INFO } = require('../../lib/game-config');
+
+const TRACK_KEYS = Object.keys(TRACK_INFO);
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
@@ -39,16 +41,23 @@ module.exports = async (req, res) => {
   // 결과물 지급
   const out = recipe.output;
   let resolvedLevel = null;
+  let resolvedTrack = null;
   if (out.type === 'protection') {
     upd[`users/${userKey}/protectionScrolls`] = (user.protectionScrolls || 0) + out.amount;
   } else if (out.type === 'star') {
-    // trackRelative: 제작자 본인 트랙의 N번째 트랙 단계(level = 17+N) 별을 지급
-    resolvedLevel = out.trackRelative != null ? 17 + out.trackRelative : out.level;
-    if (out.trackRelative != null && !user.track) {
-      return res.status(400).json({ ok: false, error: '아직 트랙에 진입하지 않아 조합할 수 없습니다.' });
+    // trackRelative: 절대 레벨이 없으므로 14+N으로 계산(트랙은 14강부터 시작). 트랙은 제작자
+    // 본인 것이 아니라 5개 트랙 중 무작위로 배정 — 어느 트랙 별이 나올지는 조합해봐야 안다.
+    resolvedLevel = out.trackRelative != null ? 14 + out.trackRelative : out.level;
+    resolvedTrack = out.trackRelative != null
+      ? TRACK_KEYS[Math.floor(Math.random() * TRACK_KEYS.length)]
+      : null;
+    // 보관함이 가득 차 있으면 재료 소모 전에 막는다 (아직 upd는 DB에 쓰이지 않은 상태라 재료 낭비 없음)
+    const totalStored = Object.values(user.storedStars || {}).reduce((a, b) => a + b, 0);
+    if (totalStored >= INVENTORY_CAP) {
+      return res.status(400).json({ ok: false, error: `인벤토리가 가득 찼습니다 (${INVENTORY_CAP}/${INVENTORY_CAP}). 별을 정리한 뒤 다시 조합하세요.` });
     }
     // 별 보관함에 추가
-    const key = stageKey(resolvedLevel, user.track);
+    const key = stageKey(resolvedLevel, resolvedTrack);
     const stored = (user.storedStars && user.storedStars[key]) || 0;
     upd[`users/${userKey}/storedStars/${key}`] = stored + 1;
     // 도감 해금
@@ -59,5 +68,5 @@ module.exports = async (req, res) => {
   }
 
   await db.ref().update(upd);
-  res.json({ ok: true, recipeId, output: { ...out, level: resolvedLevel } });
+  res.json({ ok: true, recipeId, output: { ...out, level: resolvedLevel, track: resolvedTrack } });
 };

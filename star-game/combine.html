@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>조합소 — 별 강화하기</title>
+  <title>인벤토리 — 별 강화하기</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Sora:wght@700;900&family=Hanken+Grotesk:wght@400;500;700;900&family=Geist:wght@700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -16,7 +16,7 @@
       <path d="M12 2L14.4 9.2L22 12L14.4 14.8L12 22L9.6 14.8L2 12L9.6 9.2L12 2Z" fill="black"/>
     </svg>
   </div>
-  <div class="top-header-title">인벤토리 · 조합소</div>
+  <div class="top-header-title">인벤토리</div>
 </div>
 
 <div class="page">
@@ -34,6 +34,7 @@
   <section class="inv-section">
     <div class="inv-section-head">
       <span class="inv-section-title">보관된 별</span>
+      <span class="inv-section-count" id="stored-stars-count">-</span>
     </div>
     <div class="item-slot-grid" id="stored-stars-list"></div>
   </section>
@@ -86,10 +87,15 @@ function showToast(msg) {
 function formatOutputDesc(output) {
   if (output.type === 'protection') return `붕괴 방지권 ${output.amount}개`;
   if (output.type === 'star') {
-    // trackRelative 레시피는 항상 제작자 본인 트랙 기준으로 해석
-    const track = output.level >= 17 ? currentUser.track : null;
-    const stage = resolveStage(output.level, track);
-    return `${stage ? stage.name : ''}(+${output.level}강) 별 1개`;
+    // trackRelative 레시피는 절대 레벨이 없으므로 14+N으로 먼저 계산.
+    // 트랙은 조합할 때 서버가 무작위로 정하므로 미리보기에서는 특정 이름을 보여줄 수 없다.
+    const level = output.trackRelative != null ? 14 + output.trackRelative : output.level;
+    if (output.trackRelative != null) {
+      return `무작위 트랙(+${level}강) 별 1개`;
+    }
+    const stage = resolveStage(level, null);
+    const name  = stage ? stage.name : '';
+    return `${name}(+${level}강) 별 1개`;
   }
   return '?';
 }
@@ -137,6 +143,9 @@ function renderAll(user) {
   starList.innerHTML = '';
   const stored = user.storedStars || {};
   const storedEntries = Object.entries(stored).filter(([, cnt]) => cnt > 0);
+  const totalStoredCount = storedEntries.reduce((sum, [, cnt]) => sum + cnt, 0);
+  document.getElementById('stored-stars-count').textContent = `${totalStoredCount} / ${INVENTORY_CAP}`;
+
   if (storedEntries.length === 0) {
     starList.innerHTML = '<div class="inv-empty-note">보관된 별이 없습니다.</div>';
   } else {
@@ -144,6 +153,7 @@ function renderAll(user) {
       const { level, track } = parseStageKey(key);
       const stage = resolveStage(level, track);
       const usage = starMaterialUsage(level, track);
+      const canSell = stage && stage.sellPrice;
       const slot = document.createElement('div');
       slot.className = 'item-slot' + (usage.length ? ' material' : '');
       slot.innerHTML = `
@@ -152,7 +162,15 @@ function renderAll(user) {
         <div class="item-slot-name">${stage ? stage.name : '?'}</div>
         <div class="item-slot-count">${cnt}개</div>
         ${usage.length ? `<div class="material-usage-note">${usage[0]} 재료</div>` : ''}
+        <div class="item-slot-actions" style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.4rem; width:100%;">
+          <button class="btn-secondary item-slot-load" style="width:100%; font-size:0.68rem; padding:0.3rem 0.2rem;">불러오기</button>
+          ${canSell ? `<button class="btn-secondary item-slot-sell" style="width:100%; font-size:0.68rem; padding:0.3rem 0.2rem;">판매 (${formatKoreanNumber(stage.sellPrice)})</button>` : ''}
+        </div>
       `;
+      slot.querySelector('.item-slot-load').addEventListener('click', () => handleLoadStored(key, stage));
+      if (canSell) {
+        slot.querySelector('.item-slot-sell').addEventListener('click', () => handleSellStored(key, stage));
+      }
       starList.appendChild(slot);
     });
   }
@@ -206,13 +224,32 @@ async function handleCraft(recipe) {
     if (out.type === 'protection') {
       showToast(`붕괴 방지권 ${out.amount}개 획득!`);
     } else if (out.type === 'star') {
-      const track = out.level >= 17 ? currentUser.track : null;
-      const stage = resolveStage(out.level, track);
+      const stage = resolveStage(out.level, out.track);
       showToast(`${stage ? stage.name : `+${out.level}강`}(+${out.level}강) 별 1개 획득!`);
     }
     await reload();
   } else {
     showToast(data.error || '조합 실패');
+  }
+}
+
+async function handleSellStored(key, stage) {
+  const result = await sellStoredStar(key);
+  if (result.ok) {
+    showToast(`${stage.name} 판매! 수소 ${formatNumber(result.gained)} 획득`);
+    await reload();
+  } else {
+    showToast(result.error || '판매 실패');
+  }
+}
+
+async function handleLoadStored(key, stage) {
+  const result = await loadStoredStar(key);
+  if (result.ok) {
+    // 강화 화면에서 바로 이어서 강화할 수 있도록 이동
+    location.href = 'index.html';
+  } else {
+    showToast(result.error || '불러오기 실패');
   }
 }
 

@@ -30,11 +30,11 @@
   </div>
 </div>
 
-<!-- 트랙(별 종류) 선택창 — +16강에서 다음으로 넘어갈 때 -->
+<!-- 트랙(별 종류) 선택창 — +13강에서 다음으로 넘어갈 때 -->
 <div class="codex-modal-bg" id="codex-track-modal-bg" onclick="handleTrackModalBgClick(event)">
   <div class="codex-modal">
     <div class="codex-track-title">어떤 별의 종류로 이어갈까요?</div>
-    <div class="codex-track-desc">「운명의 갈림길」에서 질량에 따라 5가지 최후 중 하나가 정해집니다. 궁금한 트랙을 골라 도감을 계속 둘러보세요.</div>
+    <div class="codex-track-desc">중심 수소가 고갈되는 순간, 별의 최초 질량에 따라 5가지 최후 중 하나가 정해집니다. 궁금한 트랙을 골라 도감을 계속 둘러보세요.</div>
     <div class="codex-track-list" id="codex-track-list"></div>
   </div>
 </div>
@@ -55,7 +55,7 @@
 
   <div class="card-title" style="padding:0.25rem 0 0.5rem;">H-R도 — 별의 진화 지도</div>
   <div style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.75rem; line-height:1.55;">
-    실제 헤르츠스프룽-러셀도 위에 강화 단계 번호를 표시했습니다. 아래 범례에서 구간을 하나 고르면 그 구간의 진행 경로가 화살표로 표시돼요. 배지를 누르면 상세 설명이 뜨고, 좌우 화살표로 이전·다음 단계를 이어서 볼 수 있습니다. +16강에서 다음으로 넘어가면 별의 종류를 고르게 됩니다.
+    실제 헤르츠스프룽-러셀도 위에 강화 단계 번호를 표시했습니다. 아래 범례에서 구간을 하나 고르면 그 구간의 진행 경로가 화살표로 표시돼요. 배지를 누르면 상세 설명이 뜨고, 좌우 화살표로 이전·다음 단계를 이어서 볼 수 있습니다. +13강(중심 수소 고갈)에서 다음으로 넘어가면 별의 종류를 고르게 됩니다.
   </div>
 
   <div class="hr-wrap">
@@ -76,17 +76,17 @@
   <div class="hr-legend" id="hr-legend"></div>
   <div class="hr-legend-hint">구간을 하나 골라야 H-R도에 그 구간의 진행 경로가 표시됩니다.</div>
 
-  <!-- 고전 H-R도 밖의 천체 (초신성 잔해 이후 — 중성자별·펄사, 블랙홀, 퀘이사 등) -->
+  <!-- 고전 H-R도 밖의 천체 (초신성 잔해 이후 — 중성자별, 블랙홀, 퀘이사 등) -->
   <div class="card-title" style="padding:1.25rem 0 0.5rem;">특이천체 및 그 너머</div>
   <div style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.6rem;">
-    별이 아니게 된 천체들 — 중성자별·펄사·블랙홀·퀘이사는 고전 H-R도 위에 놓을 자리가 없습니다.
+    별이 아니게 된 천체들 — 초신성 잔해·중성자별·블랙홀·퀘이사는 고전 H-R도 위에 놓을 자리가 없습니다.
   </div>
   <div class="hr-post-strip" id="hr-exotic-strip"></div>
 
-  <!-- 트랙 종료 후 공통 엔딩 구간 -->
-  <div class="card-title" style="padding:1.25rem 0 0.5rem;">우주로 향하는 길 (+25 ~ +29)</div>
+  <!-- 트랙 종료 후 우주 루트 -->
+  <div class="card-title" style="padding:1.25rem 0 0.5rem;">우주로 향하는 길 (+22 ~ +29)</div>
   <div style="font-size:0.78rem; color:var(--text-sub); margin-bottom:0.6rem;">
-    별 하나의 운명을 넘어 은하 → 은하군 → 은하단 → 초은하단 → 우주로, 트랙과 무관하게 다시 합류합니다.
+    별 하나의 운명을 넘어 은하 → 은하군 → 초은하단 → 필라멘트 → 우주 거미줄 → 우주 전체로, 트랙과 무관하게 다시 합류합니다.
   </div>
   <div class="hr-post-strip" id="hr-post-strip"></div>
 </div>
@@ -137,33 +137,32 @@ const COMMON_BADGE_COLOR = '#4b5563';
 // 그 곡선 위를 보간해 배정했다(오프라인 스크립트로 산출 — 이 파일 자체는 정적 데이터만 가짐).
 // 곡선이 없는 원시성 단계(0~9)·이론상 천체(청색왜성化 등)·순간적 폭발(초신성 등)은
 // 이미지의 빈 여백에 배치. 트랙별로 서로 너무 가까운 점은 최소 간격(5%)을 두도록
-// 자동 보정했다.
+// 자동 보정했다. track2~5는 +14강 "준거성"을 공유해 같은 좌표에서 시작한다.
 const HR_POS = {
   '0': { hx: 89.8, ly: 86.7 }, '1': { hx: 88.5, ly: 81.9 }, '2': { hx: 86.3, ly: 77.4 }, '3': { hx: 83.3, ly: 72.3 },
-  '4': { hx: 79.2, ly: 65.9 }, '5': { hx: 75.0, ly: 60.4 }, '6': { hx: 70.8, ly: 55.8 }, '7': { hx: 67.2, ly: 52.5 },
-  '8': { hx: 62.9, ly: 49.9 }, '9': { hx: 58.2, ly: 48.3 }, '10': { hx: 43.9, ly: 44.6 }, '11': { hx: 48.9, ly: 44.3 },
-  '12': { hx: 52.7, ly: 47.6 }, '13': { hx: 54.8, ly: 52.1 }, '14': { hx: 43.8, ly: 38.2 }, '15': { hx: 68.5, ly: 34.1 },
-  '16': { hx: 73.2, ly: 32.7 },
-  track1_17: { hx: 79.5, ly: 81.9 }, track1_18: { hx: 81.5, ly: 86.5 }, track1_19: { hx: 85.9, ly: 84.1 },
-  track1_20: { hx: 44.8, ly: 82.8 }, track1_21: { hx: 24.0, ly: 82.8 }, track1_22: { hx: 18.8, ly: 69.4 },
-  track1_23: { hx: 27.1, ly: 75.5 }, track1_24: { hx: 58.3, ly: 85.5 },
-  track2_17: { hx: 66.3, ly: 34.7 }, track2_18: { hx: 71.2, ly: 33.3 }, track2_19: { hx: 56.2, ly: 36.8 },
-  track2_20: { hx: 67.7, ly: 27.5 }, track2_21: { hx: 36.5, ly: 27.9 }, track2_22: { hx: 24.0, ly: 26.0 },
-  track2_23: { hx: 17.7, ly: 68.4 }, track2_24: { hx: 52.1, ly: 85.5 },
-  track3_17: { hx: 20.8, ly: 20.1 }, track3_18: { hx: 81.5, ly: 20.3 }, track3_19: { hx: 71.7, ly: 21.2 },
-  track3_20: { hx: 76.5, ly: 20.0 }, track3_21: { hx: 47.9, ly: 10.1 },
-  track4_17: { hx: 19.9, ly: 15.1 }, track4_18: { hx: 24.9, ly: 15.1 }, track4_19: { hx: 29.9, ly: 15.1 },
-  track4_20: { hx: 14.9, ly: 15.1 }, track4_21: { hx: 34.4, ly: 9.6 },
-  track5_17: { hx: 79.2, ly: 9.1 },  track5_18: { hx: 27.4, ly: 8.3 },  track5_19: { hx: 16.8, ly: 9.4 },
-  track5_20: { hx: 21.5, ly: 11.1 }, track5_21: { hx: 22.8, ly: 6.3 },
+  '4': { hx: 79.2, ly: 65.9 }, '5': { hx: 75.0, ly: 60.4 }, '6': { hx: 70.9, ly: 55.8 }, '7': { hx: 67.2, ly: 52.5 },
+  '8': { hx: 62.9, ly: 49.8 }, '9': { hx: 58.1, ly: 48.5 }, '10': { hx: 42.6, ly: 44.9 }, '11': { hx: 50.3, ly: 46.0 },
+  '12': { hx: 53.3, ly: 50.0 }, '13': { hx: 46.9, ly: 42.3 },
+  track1_14: { hx: 79.5, ly: 81.9 }, track1_15: { hx: 81.5, ly: 86.5 }, track1_16: { hx: 85.9, ly: 84.1 },
+  track1_17: { hx: 44.8, ly: 82.8 }, track1_18: { hx: 24.0, ly: 82.8 }, track1_19: { hx: 18.8, ly: 69.4 },
+  track1_20: { hx: 27.1, ly: 75.5 }, track1_21: { hx: 58.3, ly: 85.5 },
+  track2_14: { hx: 43.2, ly: 38.2 }, track2_15: { hx: 66.3, ly: 34.7 }, track2_16: { hx: 71.2, ly: 33.3 },
+  track2_17: { hx: 56.2, ly: 36.8 }, track2_18: { hx: 67.7, ly: 27.5 }, track2_19: { hx: 36.5, ly: 27.9 },
+  track2_20: { hx: 24.0, ly: 26.0 }, track2_21: { hx: 17.7, ly: 68.4 },
+  track3_14: { hx: 43.2, ly: 38.2 }, track3_15: { hx: 20.8, ly: 20.1 }, track3_16: { hx: 81.5, ly: 20.3 },
+  track3_17: { hx: 71.7, ly: 21.2 }, track3_18: { hx: 76.5, ly: 20.0 }, track3_19: { hx: 47.9, ly: 10.1 },
+  track4_14: { hx: 43.2, ly: 38.2 }, track4_15: { hx: 19.9, ly: 15.1 }, track4_16: { hx: 24.9, ly: 15.1 },
+  track4_17: { hx: 29.9, ly: 15.1 }, track4_18: { hx: 14.9, ly: 15.1 }, track4_19: { hx: 34.4, ly: 9.6 },
+  track5_14: { hx: 43.2, ly: 38.2 }, track5_15: { hx: 79.2, ly: 9.1 },  track5_16: { hx: 27.6, ly: 8.3 },
+  track5_17: { hx: 20.2, ly: 10.4 }, track5_18: { hx: 23.0, ly: 6.3 },
 };
 
-// track3/4/5의 22~24강 — 초신성 잔해 이후 고전 H-R도 밖의 천체
-const EXOTIC_LEVELS = { track3: [22, 23, 24], track4: [22, 23, 24], track5: [22, 23, 24] };
+// 고전 H-R도 밖의 천체 (초신성 잔해 이후 — track마다 별이 아니게 되는 시점부터 다름)
+const EXOTIC_LEVELS = { track3: [20, 21], track4: [20, 21], track5: [19, 20, 21] };
 
 // H-R도 6구간(공통 + 트랙5) — 범례가 곧 단일 선택 필터
 const SECTION_LIST = [
-  { id: 'common', color: COMMON_BADGE_COLOR, name: '공통 구간 (+0~16)' },
+  { id: 'common', color: COMMON_BADGE_COLOR, name: '공통 구간 (+0~13)' },
   ...Object.entries(TRACK_INFO).map(([k, info]) => ({ id: k, color: TRACK_COLORS[k], name: info.name })),
 ];
 let selectedSection = 'common';
@@ -181,7 +180,7 @@ let unlockedSet = new Set();
 // 모달이 현재 보여주는 단계 + 화살표 탐색용 상태
 let modalLevel = null;
 let modalTrack = null;
-let modalLastTrack = null; // 25강 이전(뒤로가기) 시 어느 트랙 24강으로 돌아갈지
+let modalLastTrack = null; // +22강 이전(뒤로가기) 시 어느 트랙 21강으로 돌아갈지
 
 function handleModalBgClick(e) {
   if (e.target === document.getElementById('codex-modal-bg')) {
@@ -229,20 +228,20 @@ function navigateEntry(direction) {
   let level = modalLevel, track = modalTrack;
 
   if (direction > 0) {
-    if (level === 16) { openTrackChooser(); return; }
-    if (level === 24) { openEntry(25, null); return; }
+    if (level === 13) { openTrackChooser(); return; }
+    if (level === 21) { openEntry(22, null); return; }
     if (level >= 29) return;
-    openEntry(level + 1, level < 16 || level >= 25 ? null : track);
+    openEntry(level + 1, level < 13 || level >= 22 ? null : track);
     return;
   }
 
   if (level <= 0) return;
-  if (level === 25) { openEntry(24, modalLastTrack); return; }
-  if (level === 17) { openEntry(16, null); return; }
-  openEntry(level - 1, level <= 16 || level > 25 ? null : track);
+  if (level === 22) { openEntry(21, modalLastTrack); return; }
+  if (level === 14) { openEntry(13, null); return; }
+  openEntry(level - 1, level <= 13 || level > 22 ? null : track);
 }
 
-/** +16강 → 다음 : 5개 트랙 중 하나를 고르는 선택창 */
+/** +13강 → 다음 : 5개 트랙 중 하나를 고르는 선택창 */
 function openTrackChooser() {
   const list = document.getElementById('codex-track-list');
   list.innerHTML = '';
@@ -252,7 +251,7 @@ function openTrackChooser() {
     btn.innerHTML = `<span class="codex-track-option-name">${info.name}</span><span class="codex-track-option-sub">${info.subname}</span>`;
     btn.addEventListener('click', () => {
       document.getElementById('codex-track-modal-bg').classList.remove('visible');
-      openEntry(17, trackKey);
+      openEntry(14, trackKey);
     });
     list.appendChild(btn);
   });
@@ -373,7 +372,7 @@ async function renderCodex() {
   document.getElementById('unlock-count').textContent =
     `해금: ${unlockedSet.size} / ${TOTAL_ENTRIES}`;
 
-  // +25강에서 뒤로 가기 안전장치 — 이번 탐색에서 트랙 페이지를 한 번도 안 봤다면
+  // +22강에서 뒤로 가기 안전장치 — 이번 탐색에서 트랙 페이지를 한 번도 안 봤다면
   // 실제로 배정된 내 트랙(user.track)으로 되돌아간다(스포일러 아님, 실제 진행 정보).
   modalLastTrack = user.track || null;
 
@@ -381,7 +380,7 @@ async function renderCodex() {
   renderLegend();
   renderHrMap();
 
-  // 특이천체 및 그 너머 (고전 H-R도 밖 — track3/4/5의 22~24강)
+  // 특이천체 및 그 너머 (고전 H-R도 밖)
   const exoticStrip = document.getElementById('hr-exotic-strip');
   exoticStrip.innerHTML = '';
   Object.entries(EXOTIC_LEVELS).forEach(([trackKey, levels]) => {
@@ -392,7 +391,7 @@ async function renderCodex() {
     });
   });
 
-  // 우주로 향하는 길 (+25 ~ +29)
+  // 우주로 향하는 길 (+22 ~ +29)
   const postStrip = document.getElementById('hr-post-strip');
   postStrip.innerHTML = '';
   POST_TRACK_STAGES.forEach(stage => {

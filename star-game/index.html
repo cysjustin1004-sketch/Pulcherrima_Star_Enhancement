@@ -113,11 +113,11 @@
     </div>
   </div>
 
-  <!-- +29 달성 메시지 (평소 숨김) -->
+  <!-- +29강(전체 우주) 달성 메시지 (평소 숨김) -->
   <div class="card" id="legend-card" style="display:none; text-align:center;">
     <div style="font-size:2rem; margin-bottom:0.5rem;">✨</div>
     <div style="font-size:1.1rem; font-weight:700; color:var(--accent); margin-bottom:0.4rem;">우주 도달!</div>
-    <div style="font-size:0.85rem; color:var(--text-sub);">별 하나에서 시작해 은하, 은하군, 은하단, 초은하단을 지나 마침내 우주 그 자체에 도달했습니다. 전설의 경지에 올랐습니다.</div>
+    <div style="font-size:0.85rem; color:var(--text-sub);">별 하나에서 시작해 은하, 은하군, 초은하단, 필라멘트, 우주 거미줄을 지나 마침내 우주 그 자체에 도달했습니다. 전설의 경지에 올랐습니다.</div>
   </div>
 
   <!-- 강화 버튼 영역 -->
@@ -127,9 +127,9 @@
     <!-- 별 보관 버튼 (보관 가능한 별에서만 표시) -->
     <button class="btn-outline" id="btn-store" style="display:none;">📦 별 보관하기</button>
 
-    <!-- 액션 행: 0강=아이템창+상점 / 1강+=조합소+판매하기 -->
+    <!-- 액션 행: 0강=인벤토리+상점 / 1강+=인벤토리+판매하기 -->
     <div class="action-row">
-      <button class="btn-secondary" id="btn-left"  onclick="location.href='combine.html'">조합소</button>
+      <button class="btn-secondary" id="btn-left"  onclick="location.href='combine.html'">인벤토리</button>
       <button class="btn-secondary" id="btn-right" onclick="location.href='shop.html'">상점</button>
     </div>
   </div>
@@ -267,17 +267,19 @@ function updateUI(user) {
   const btnStore = document.getElementById('btn-store');
   btnStore.style.display = level >= 1 ? '' : 'none';
 
-  // 액션 행: 0강=아이템창+상점 / 1강+=조합소+판매
+  // 왼쪽 버튼은 레벨과 무관하게 항상 인벤토리(아이템/보관별 확인 + 조합) — 이름을 통일해 혼란 방지
   const btnLeft  = document.getElementById('btn-left');
   const btnRight = document.getElementById('btn-right');
+  btnLeft.textContent = '인벤토리';
+  btnLeft.onclick     = () => location.href = 'combine.html';
+  btnLeft.disabled    = false;
+
+  // 오른쪽 버튼은 레벨에 따라 역할이 실제로 다름: 0강=상점(아직 팔 별이 없음) / 1강+=판매
   if (level === 0) {
-    btnLeft.textContent  = '아이템창';
-    btnLeft.onclick      = () => location.href = 'combine.html';
     btnRight.textContent = '상점';
     btnRight.onclick     = () => location.href = 'shop.html';
+    btnRight.disabled    = false;
   } else {
-    btnLeft.textContent  = '조합소';
-    btnLeft.onclick      = () => location.href = 'combine.html';
     btnRight.textContent = `판매 (${formatNumber(stage.sellPrice || 0)} 수소)`;
     btnRight.onclick     = handleSell;
     // 판매 불가 시 비활성화 (+28)
@@ -305,13 +307,12 @@ function formatCost(cost, user) {
     return `<span style="color:${color}">${ITEM_NAMES[cost.key]} ${cost.amount}개 (보유: ${held})</span>`;
   }
   if (cost.type === 'star') {
-    const key     = stageKey(cost.level, user.track);
-    const stored  = (user.storedStars && user.storedStars[key]) || 0;
+    // 트랙 무관 — 어느 트랙에서 보관했든 레벨만 맞으면 재료로 인정되므로
+    // 특정 트랙 이름 대신 레벨로만 표시
+    const stored  = sumStoredStarAcrossTracks(user.storedStars, cost.level);
     const enough  = stored >= cost.amount;
     const color   = enough ? 'var(--success)' : 'var(--danger)';
-    const stage   = resolveStage(cost.level, user.track);
-    const name    = stage ? stage.name : `+${cost.level}강 별`;
-    return `<span style="color:${color}">${name} ${cost.amount}개 (보유: ${stored})</span>`;
+    return `<span style="color:${color}">+${cost.level}강 별 ${cost.amount}개 (보유: ${stored})</span>`;
   }
   return '-';
 }
@@ -321,10 +322,7 @@ function canAffordCost(cost, user) {
   if (!cost) return false;
   if (cost.type === 'hydrogen') return (user.hydrogen || 0) >= cost.amount;
   if (cost.type === 'item')     return ((user.items && user.items[cost.key]) || 0) >= cost.amount;
-  if (cost.type === 'star') {
-    const key = stageKey(cost.level, user.track);
-    return ((user.storedStars && user.storedStars[key]) || 0) >= cost.amount;
-  }
+  if (cost.type === 'star')     return sumStoredStarAcrossTracks(user.storedStars, cost.level) >= cost.amount;
   return false;
 }
 
@@ -381,9 +379,18 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
       if (stage.cost.type === 'hydrogen') currentUser.hydrogen = Math.max(0, (currentUser.hydrogen || 0) - stage.cost.amount);
       else if (stage.cost.type === 'item' && currentUser.items) currentUser.items[stage.cost.key] = Math.max(0, (currentUser.items[stage.cost.key] || 0) - stage.cost.amount);
       else if (stage.cost.type === 'star') {
+        // 서버와 동일하게 트랙 무관 — 여러 트랙에 나뉘어 있으면 순서대로 차감
         if (!currentUser.storedStars) currentUser.storedStars = {};
-        const costKey = stageKey(stage.cost.level, currentUser.track);
-        currentUser.storedStars[costKey] = Math.max(0, (currentUser.storedStars[costKey] || 0) - stage.cost.amount);
+        let remaining = stage.cost.amount;
+        for (const t of Object.keys(TRACK_INFO)) {
+          if (remaining <= 0) break;
+          const k = `${t}_${stage.cost.level}`;
+          const have = currentUser.storedStars[k] || 0;
+          if (have <= 0) continue;
+          const take = Math.min(have, remaining);
+          currentUser.storedStars[k] = have - take;
+          remaining -= take;
+        }
       }
     }
     if (result.assignedTrack) currentUser.track = result.assignedTrack;
@@ -498,7 +505,7 @@ document.getElementById('btn-store').addEventListener('click', async () => {
   if (level < 1) return;
 
   const stage = resolveStage(level, currentUser.track);
-  if (!confirm(`+${level}강 별(${stage.name})을 보관하시겠습니까?\n보관된 별은 조합소에서 사용할 수 있습니다.`)) return;
+  if (!confirm(`+${level}강 별(${stage.name})을 보관하시겠습니까?\n보관된 별은 인벤토리에서 확인할 수 있습니다.`)) return;
 
   const result = await storeStar();
   if (result.ok) {

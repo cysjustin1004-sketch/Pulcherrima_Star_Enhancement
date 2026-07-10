@@ -6,14 +6,17 @@ async function list(req, res) {
   const userKey = await validateSession(req);
   if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
 
-  const [friendsSnap, requestsSnap] = await Promise.all([
+  const [friendsSnap, requestsSnap, sentSnap] = await Promise.all([
     db.ref(`friends/${userKey}`).get(),
     db.ref(`friendRequests/${userKey}`).get(),
+    db.ref(`friendRequestsSent/${userKey}`).get(),
   ]);
 
   const friendEntries = [];
   if (friendsSnap.exists()) {
-    friendsSnap.forEach(child => friendEntries.push({ userKey: child.key, meta: child.val() }));
+    // forEach 콜백이 truthy를 반환하면 Firebase가 순회를 중단시키므로,
+    // push()의 반환값(추가 후 배열 길이)이 암묵적으로 리턴되지 않도록 블록으로 감싼다.
+    friendsSnap.forEach(child => { friendEntries.push({ userKey: child.key, meta: child.val() }); });
   }
 
   // 친구별 최신 장비 별/전적도 함께 내려줌 (배틀 상대 선택 화면에서 재조회 없이 사용)
@@ -43,7 +46,15 @@ async function list(req, res) {
     });
   }
 
-  res.json({ ok: true, friends, incoming });
+  const sent = [];
+  if (sentSnap.exists()) {
+    sentSnap.forEach(child => {
+      const d = child.val();
+      sent.push({ toKey: child.key, toNickname: d.toNickname, createdAt: d.createdAt });
+    });
+  }
+
+  res.json({ ok: true, friends, incoming, sent });
 }
 
 async function request(req, res) {
@@ -86,9 +97,10 @@ async function request(req, res) {
     return res.json({ ok: true, autoAccepted: true });
   }
 
-  await db.ref(`friendRequests/${toKey}/${userKey}`).set({
-    fromNickname: me.nickname,
-    createdAt: Date.now(),
+  const createdAt = Date.now();
+  await db.ref().update({
+    [`friendRequests/${toKey}/${userKey}`]:     { fromNickname: me.nickname, createdAt },
+    [`friendRequestsSent/${userKey}/${toKey}`]: { toNickname: target.nickname, createdAt },
   });
 
   res.json({ ok: true, autoAccepted: false });
@@ -109,7 +121,10 @@ async function respond(req, res) {
   }
 
   if (action === 'reject') {
-    await db.ref(`friendRequests/${userKey}/${fromKey}`).remove();
+    await db.ref().update({
+      [`friendRequests/${userKey}/${fromKey}`]:     null,
+      [`friendRequestsSent/${fromKey}/${userKey}`]: null,
+    });
     return res.json({ ok: true });
   }
 
@@ -125,10 +140,31 @@ async function respond(req, res) {
   await db.ref().update({
     [`friends/${userKey}/${fromKey}`]: { nickname: fromSnap.val().nickname, since: now },
     [`friends/${fromKey}/${userKey}`]: { nickname: meSnap.val().nickname, since: now },
-    [`friendRequests/${userKey}/${fromKey}`]: null,
+    [`friendRequests/${userKey}/${fromKey}`]:     null,
+    [`friendRequestsSent/${fromKey}/${userKey}`]: null,
   });
 
   res.json({ ok: true, friend: { userKey: fromKey, nickname: fromSnap.val().nickname, since: now } });
+}
+
+async function cancel(req, res) {
+  const userKey = await validateSession(req);
+  if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  const { toKey } = req.body;
+  if (!toKey) return res.status(400).json({ ok: false, error: '대상을 지정하세요.' });
+
+  const sentSnap = await db.ref(`friendRequestsSent/${userKey}/${toKey}`).get();
+  if (!sentSnap.exists()) {
+    return res.status(404).json({ ok: false, error: '보낸 친구 요청을 찾을 수 없습니다.' });
+  }
+
+  await db.ref().update({
+    [`friendRequests/${toKey}/${userKey}`]:     null,
+    [`friendRequestsSent/${userKey}/${toKey}`]: null,
+  });
+
+  res.json({ ok: true });
 }
 
 async function search(req, res) {
@@ -167,7 +203,7 @@ async function search(req, res) {
   });
 }
 
-const ROUTES = { list, request, respond, search };
+const ROUTES = { list, request, respond, search, cancel };
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();

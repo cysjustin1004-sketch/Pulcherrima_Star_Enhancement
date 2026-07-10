@@ -25,6 +25,11 @@
     <div id="incoming-requests-list"></div>
   </div>
 
+  <div id="sent-requests-section" style="display:none;">
+    <div class="section-label">보낸 친구 요청</div>
+    <div id="sent-requests-list"></div>
+  </div>
+
   <div class="section-label">친구 목록</div>
   <div id="friend-list">
     <div style="text-align:center; color:var(--text-sub); padding:2rem;">로딩 중...</div>
@@ -91,6 +96,7 @@ const session = requireAuth();
 if (!session) throw new Error('no session');
 
 let friendCache = [];   // 최근 friends/list 결과 캐시(프로필/배틀 이동에 사용)
+let sentCache = [];     // 최근 friends/list의 보낸 요청 캐시(검색 결과에서 중복 요청 방지)
 let currentChatWith = null;
 let chatPollTimer = null;
 
@@ -100,8 +106,46 @@ async function loadList() {
   const res = await apiCall('/api/friends/list', {});
   if (!res.ok) { showToast(res.error || '목록을 불러오지 못했습니다.'); return; }
   friendCache = res.friends;
+  sentCache = res.sent || [];
   renderIncoming(res.incoming);
+  renderSent(res.sent);
   renderFriends(res.friends);
+}
+
+function renderSent(sent) {
+  const section = document.getElementById('sent-requests-section');
+  const list = document.getElementById('sent-requests-list');
+  if (!sent || sent.length === 0) { section.style.display = 'none'; return; }
+
+  section.style.display = '';
+  list.innerHTML = '';
+  sent.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'request-row';
+    row.innerHTML = `
+      <div class="request-info">
+        <div class="request-name">${escapeHtml(r.toNickname)}</div>
+        <div class="friend-preview">상대의 수락을 기다리는 중</div>
+      </div>
+      <div class="request-actions">
+        <button class="btn-danger" data-key="${r.toKey}">취소</button>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+
+  list.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const toKey = btn.dataset.key;
+      const res = await apiCall('/api/friends/cancel', { toKey });
+      if (res.ok) {
+        showToast('보낸 요청을 취소했습니다.');
+        await loadList();
+      } else {
+        showToast(res.error || '취소 실패');
+      }
+    });
+  });
 }
 
 function renderIncoming(incoming) {
@@ -202,6 +246,7 @@ async function doSearch() {
   box.innerHTML = '';
   res.results.forEach(u => {
     const alreadyFriend = friendCache.some(f => f.userKey === u.userKey);
+    const alreadySent    = sentCache.some(s => s.toKey === u.userKey);
     const row = document.createElement('div');
     row.className = 'friend-row';
     row.innerHTML = `
@@ -211,7 +256,12 @@ async function doSearch() {
         <div class="friend-record">+${u.currentStar}강 · 배틀 ${u.battleWins}승 ${u.battleLosses}패</div>
       </div>
     `;
-    if (!alreadyFriend) {
+    if (alreadySent) {
+      const badge = document.createElement('div');
+      badge.style.cssText = 'font-size:0.8rem; color:var(--text-sub); flex-shrink:0;';
+      badge.textContent = '요청 대기중';
+      row.appendChild(badge);
+    } else if (!alreadyFriend) {
       const btn = document.createElement('button');
       btn.className = 'btn-primary';
       btn.style.width = 'auto';

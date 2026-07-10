@@ -142,14 +142,14 @@ const COMMON_STAGES = [
   {
     level: 7,
     name: '허빅-하로 천체',
-    subname: '양극 제트',
+    subname: 'HH 46/47',
     type: '별 생성 유출류',
     cost: { type: 'hydrogen', amount: 15000 },
     successRate: 0.75,
     sellPrice: 25000,
     protectionCost: 1,
     drop: { key: ITEM_KEYS.STELLAR_WIND, min: 1, max: 3 },
-    codexDescription: '【발견: 1940~50년대, 허빅과 하로】 원시별에서 뿜어져 나온 물질이 초속 수백 km로 주변 가스와 충돌하며 빛나는 충격파 구조. 원시별 양극에서 대칭적인 제트 형태로 뻗어나가는 모습이 특징이다.',
+    codexDescription: '【거리: 약 1,470광년 / 돛자리(Vela) 방향】 원시별에서 뿜어져 나온 물질이 초속 수백 km로 주변 가스와 충돌하며 빛나는 충격파 구조. HH 46/47은 2022년 제임스 웹 우주망원경이 촬영해 양극 제트 구조를 선명하게 보여준 대표적인 허빅-하로 천체다.',
   },
   {
     level: 8,

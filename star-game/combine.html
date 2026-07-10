@@ -152,7 +152,11 @@ function renderAll(user) {
     storedEntries.forEach(([key, cnt]) => {
       const { level, track } = parseStageKey(key);
       const stage = resolveStage(level, track);
-      const usage = starMaterialUsage(level, track);
+      // 재료 소모는 트랙 무관 풀링(sumStoredStarAcrossTracks)이라, 이 별이 실제로
+      // 소모될 곳은 이 별 "자신의" 트랙이 아니라 내 계정이 실제로 밟고 있는
+      // currentUser.track의 상위 강화 단계다 — 별의 트랙(track)을 넘기면
+      // 크래프팅/이전 워프로 다른 트랙 별을 보관 중일 때 엉뚱한 안내가 뜬다.
+      const usage = starMaterialUsage(level, currentUser.track);
       const canSell = stage && stage.sellPrice;
       const slot = document.createElement('div');
       slot.className = 'item-slot' + (usage.length ? ' material' : '');

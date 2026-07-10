@@ -33,14 +33,14 @@ const ITEM_KEYS = {
 
 // 아이템 표시 이름
 const ITEM_NAMES = {
-  [ITEM_KEYS.STELLAR_WIND]:    '항성풍 파편',
-  [ITEM_KEYS.HYPERGIANT_CORE]: '극초거성 핵 파편',
-  [ITEM_KEYS.SUPERNOVA_GLOW]:  '초신성 잔광',
-  [ITEM_KEYS.NEUTRON_CRUST]:   '중성자별 껍질 조각',
-  [ITEM_KEYS.PULSAR_SIGNAL]:   '펄사 전파 신호',
-  [ITEM_KEYS.MAGNETAR_FLARE]:  '마그네타 섬광',
-  [ITEM_KEYS.HAWKING]:         '호킹 복사',
-  [ITEM_KEYS.DARK_MATTER]:     '암흑 물질 조각',
+  [ITEM_KEYS.STELLAR_WIND]:    '영면을 맞이한 작은 행성',
+  [ITEM_KEYS.HYPERGIANT_CORE]: '어린 별의 심장',
+  [ITEM_KEYS.SUPERNOVA_GLOW]:  '사라지는 별빛의 여명',
+  [ITEM_KEYS.NEUTRON_CRUST]:   '별이 남긴 잔광',
+  [ITEM_KEYS.PULSAR_SIGNAL]:   '끝없는 밤에 잠든 성광',
+  [ITEM_KEYS.MAGNETAR_FLARE]:  '뭇별이 애도한 불꽃',
+  [ITEM_KEYS.HAWKING]:         '이름 없는 별의 유언',
+  [ITEM_KEYS.DARK_MATTER]:     '적막의 여정',
 };
 
 // ============================================================
@@ -544,55 +544,55 @@ const RECIPES = [
     id: 'r1',
     inputs: [{ key: ITEM_KEYS.STELLAR_WIND, amount: 8 }],
     output: { type: 'protection', amount: 1 },
-    desc: '항성풍 파편 8개 → 붕괴 방지권 1개',
+    desc: '영면을 맞이한 작은 행성 8개 → 붕괴 방지권 1개',
   },
   {
     id: 'r2',
     inputs: [{ key: ITEM_KEYS.HYPERGIANT_CORE, amount: 5 }],
     output: { type: 'protection', amount: 1 },
-    desc: '극초거성 핵 파편 5개 → 붕괴 방지권 1개',
+    desc: '어린 별의 심장 5개 → 붕괴 방지권 1개',
   },
   {
     id: 'r3',
     inputs: [{ key: ITEM_KEYS.SUPERNOVA_GLOW, amount: 3 }],
     output: { type: 'star', level: 13 },
-    desc: '초신성 잔광 3개 → +13강 별 1개',
+    desc: '사라지는 별빛의 여명 3개 → +13강 별 1개',
   },
   {
     id: 'r4',
     inputs: [{ key: ITEM_KEYS.NEUTRON_CRUST, amount: 5 }],
     output: { type: 'protection', amount: 2 },
-    desc: '중성자별 껍질 조각 5개 → 붕괴 방지권 2개',
+    desc: '별이 남긴 잔광 5개 → 붕괴 방지권 2개',
   },
   {
     id: 'r5',
     inputs: [{ key: ITEM_KEYS.PULSAR_SIGNAL, amount: 2 }],
     output: { type: 'star', trackRelative: 2 },
-    desc: '펄사 전파 신호 2개 → 무작위 트랙 +16강 별 1개',
+    desc: '끝없는 밤에 잠든 성광 2개 → 무작위 트랙 +16강 별 1개',
   },
   {
     id: 'r6',
     inputs: [{ key: ITEM_KEYS.MAGNETAR_FLARE, amount: 4 }],
     output: { type: 'protection', amount: 4 },
-    desc: '마그네타 섬광 4개 → 붕괴 방지권 4개',
+    desc: '뭇별이 애도한 불꽃 4개 → 붕괴 방지권 4개',
   },
   {
     id: 'r7',
     inputs: [{ key: ITEM_KEYS.MAGNETAR_FLARE, amount: 4 }],
     output: { type: 'star', trackRelative: 5 },
-    desc: '마그네타 섬광 4개 → 무작위 트랙 +19강 별 1개',
+    desc: '뭇별이 애도한 불꽃 4개 → 무작위 트랙 +19강 별 1개',
   },
   {
     id: 'r8',
     inputs: [{ key: ITEM_KEYS.HAWKING, amount: 6 }],
     output: { type: 'protection', amount: 10 },
-    desc: '호킹 복사 6개 → 붕괴 방지권 10개',
+    desc: '이름 없는 별의 유언 6개 → 붕괴 방지권 10개',
   },
   {
     id: 'r9',
     inputs: [{ key: ITEM_KEYS.DARK_MATTER, amount: 4 }],
     output: { type: 'protection', amount: 11 },
-    desc: '암흑 물질 조각 4개 → 붕괴 방지권 11개',
+    desc: '적막의 여정 4개 → 붕괴 방지권 11개',
   },
 ];
 

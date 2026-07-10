@@ -623,7 +623,10 @@ input::placeholder { color: #9a9a9a; }
   box-shadow: 1px 1px 0 #000;
   transition: transform 0.1s;
 }
-.hr-badge:active { transform: translate(-50%, -50%) scale(0.9); }
+/* 명시도를 전역 button:active:not(:disabled) 규칙보다 높여야 한다 —
+   그렇지 않으면 누르는 동안 -50%,-50% 중심 이동이 사라져 배지가 커서
+   아래에서 벗어나고, PC에서 마우스로 누르고 뗄 때 클릭이 성립하지 않는다. */
+.hr-map .hr-badge:active { transform: translate(-50%, -50%) scale(0.9); }
 .hr-badge.locked {
   background: rgba(0, 0, 0, 0.55);
   border-color: var(--text-sub);
@@ -650,7 +653,7 @@ input::placeholder { color: #9a9a9a; }
   cursor: pointer;
   transition: transform 0.1s;
 }
-.hr-legend-chip:active { transform: translate(1px, 1px); }
+.hr-legend .hr-legend-chip:active { transform: translate(1px, 1px); }
 .hr-legend-chip.active {
   color: #fff;
   background: var(--chip-color, var(--text));
@@ -724,14 +727,22 @@ input::placeholder { color: #9a9a9a; }
 }
 .codex-modal-bg.visible { display: flex; }
 
-.codex-modal {
+/* 모달 + 좌우 화살표를 함께 담는 래퍼 — .codex-modal 자체는 overflow-y:auto라
+   가로 오버플로도 함께 잘려서(CSS 스펙상 두 축 중 하나가 auto면 나머지도
+   auto로 강제됨), 박스 밖으로 살짝 튀어나가는 화살표가 잘렸다. 화살표 버튼을
+   이 래퍼(잘리지 않음)의 자식으로 옮기고, .codex-modal은 래퍼 안에 꽉 채운다. */
+.codex-modal-frame {
   position: relative;
+  width: 100%;
+  max-width: 400px;
+}
+
+.codex-modal {
   background: var(--bg2);
   border: var(--border-w) solid var(--border);
   box-shadow: var(--shadow-lg);
   padding: 1.5rem;
   width: 100%;
-  max-width: 400px;
   max-height: 80vh;
   overflow-y: auto;
 }

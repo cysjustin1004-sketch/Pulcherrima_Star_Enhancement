@@ -34,6 +34,7 @@
     </button>
     <div class="codex-modal-level" id="profile-star-level"></div>
     <div class="codex-modal-name" id="profile-nickname"></div>
+    <div style="font-size:0.72rem; color:var(--text-sub); margin-bottom:0.4rem;" id="profile-identity"></div>
     <div class="codex-modal-sub" id="profile-star-name"></div>
     <div class="star-visual" style="margin:1rem auto;">
       <img class="star-img" id="profile-star-img" src="" alt="">
@@ -551,6 +552,7 @@ async function openMyProfile() {
   const stage = resolveStage(res.currentStar, res.track) || COMMON_STAGES[0];
   document.getElementById('profile-star-level').textContent = `+${res.currentStar}강`;
   document.getElementById('profile-nickname').textContent = res.nickname;
+  document.getElementById('profile-identity').textContent = formatIdentity(res.studentId, res.realName);
   document.getElementById('profile-star-name').textContent = stage.name;
   document.getElementById('profile-star-img').src = starImagePath(res.picLevel, res.picTrack);
 

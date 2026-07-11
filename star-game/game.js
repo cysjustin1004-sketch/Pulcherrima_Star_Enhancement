@@ -103,6 +103,14 @@ async function setProfilePic(key) {
   return apiCall('/api/game/setProfilePic', { key });
 }
 
+/** 프로필에 표시할 실제 학번/이름 문구 — 0000(선생님/외부인)은 이름만, 나머지는 학번+이름 */
+function formatIdentity(studentId, realName) {
+  if (!realName) return '';
+  if (studentId === '0000') return `${realName}님`;
+  if (studentId) return `${studentId} ${realName}`;
+  return '';
+}
+
 // ─── 숫자 포맷 ───────────────────────────────────────────────
 
 function formatNumber(n) {

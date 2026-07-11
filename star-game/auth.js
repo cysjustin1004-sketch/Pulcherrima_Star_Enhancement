@@ -68,15 +68,26 @@ function requireAuth() {
 
 // ─── 회원가입 ───────────────────────────────────────────────
 
+// 학번 4자리: [학년(1~3)][반(1~5)][번호(01~21)]. 선생님/외부인은 예외적으로 "0000"을 쓴다.
+const STUDENT_ID_PATTERN = /^[1-3][1-5](0[1-9]|1[0-9]|2[01])$/;
+
 /**
  * 회원가입 — /api/auth/register 호출
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
-async function register(nickname, password) {
+async function register(nickname, studentId, realName, password) {
   const nick = nickname.trim();
+  const sid  = studentId.trim();
+  const name = realName.trim();
 
   if (!nick || nick.length < 2 || nick.length > 12) {
     return { ok: false, error: '닉네임은 2~12자여야 합니다.' };
+  }
+  if (sid !== '0000' && !STUDENT_ID_PATTERN.test(sid)) {
+    return { ok: false, error: '학번은 학년(1~3)·반(1~5)·번호(01~21) 4자리이거나, 선생님/외부인은 0000을 입력하세요.' };
+  }
+  if (!name || name.length > 20) {
+    return { ok: false, error: '이름을 입력하세요(20자 이하).' };
   }
   if (!password || password.length < 4) {
     return { ok: false, error: '비밀번호는 4자 이상이어야 합니다.' };
@@ -88,7 +99,7 @@ async function register(nickname, password) {
     const res  = await fetch('/api/auth/register', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ nickname: nick, passwordHash }),
+      body:    JSON.stringify({ nickname: nick, studentId: sid, realName: name, passwordHash }),
     });
     const data = await res.json();
     if (!data.ok) return { ok: false, error: data.error || '회원가입 실패' };

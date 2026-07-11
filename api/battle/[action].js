@@ -244,6 +244,8 @@ async function profile(req, res) {
   res.json({
     ok: true,
     nickname: opp.nickname,
+    studentId: opp.studentId || null,
+    realName: opp.realName || null,
     currentStar: opp.currentStar || 0,
     track: opp.track || null,
     picLevel,

@@ -43,15 +43,26 @@ async function login(req, res) {
   res.json({ ok: true, token, userKey, nickname: user.nickname });
 }
 
+// 학번 4자리: [학년(1~3)][반(1~5)][번호(01~21)]. 선생님/외부인은 예외적으로 "0000"을 쓴다.
+const STUDENT_ID_PATTERN = /^[1-3][1-5](0[1-9]|1[0-9]|2[01])$/;
+
 async function register(req, res) {
-  const { nickname, passwordHash } = req.body;
+  const { nickname, passwordHash, studentId, realName } = req.body;
   const nick = (nickname || '').trim();
+  const sid  = (studentId || '').trim();
+  const name = (realName || '').trim();
 
   if (!nick || nick.length < 2 || nick.length > 12) {
     return res.status(400).json({ ok: false, error: '닉네임은 2~12자여야 합니다.' });
   }
   if (!passwordHash || passwordHash.length !== 64) {
     return res.status(400).json({ ok: false, error: '비밀번호가 유효하지 않습니다.' });
+  }
+  if (sid !== '0000' && !STUDENT_ID_PATTERN.test(sid)) {
+    return res.status(400).json({ ok: false, error: '학번은 학년(1~3)·반(1~5)·번호(01~21) 4자리이거나, 선생님/외부인은 0000을 입력하세요.' });
+  }
+  if (!name || name.length > 20) {
+    return res.status(400).json({ ok: false, error: '이름을 입력하세요(20자 이하).' });
   }
 
   const userKey = nicknameToKey(nick);
@@ -60,29 +71,42 @@ async function register(req, res) {
     return res.status(409).json({ ok: false, error: '이미 사용 중인 닉네임입니다.' });
   }
 
+  const upd = {};
+
+  // 0000(선생님/외부인)은 여러 명이 공유할 수 있어 중복 검사에서 제외 — 그 외 학번은
+  // studentIds/{학번} 인덱스로 단 한 명만 등록되도록 보장(users 전체를 훑지 않고 조회 1번으로 확인).
+  if (sid !== '0000') {
+    const sidSnap = await db.ref(`studentIds/${sid}`).get();
+    if (sidSnap.exists()) {
+      return res.status(409).json({ ok: false, error: '이미 등록된 학번입니다.' });
+    }
+    upd[`studentIds/${sid}`] = userKey;
+  }
+
   const now = Date.now();
   // authSecrets/users 두 쓰기를 하나의 update()로 묶어 왕복 횟수를 줄이고,
   // 둘 중 하나만 반영된 채 끊기는 중간 상태의 가능성도 함께 줄인다.
-  await db.ref().update({
-    [`authSecrets/${userKey}`]: { passwordHash },
-    [`users/${userKey}`]: {
-      nickname: nick,
-      hydrogen: STARTING_HYDROGEN,
-      currentStar: 0,
-      bestStar: 0,
-      protectionScrolls: 0,
-      battleWins: 0,
-      battleLosses: 0,
-      unlockedCodex: ['0'],
-      items: {
-        stellar_wind: 0, hypergiant_core: 0, supernova_glow: 0,
-        neutron_crust: 0, pulsar_signal: 0, magnetar_flare: 0,
-        hawking_radiation: 0, dark_matter: 0,
-      },
-      storedStars: {},
-      createdAt: now,
+  upd[`authSecrets/${userKey}`] = { passwordHash };
+  upd[`users/${userKey}`] = {
+    nickname: nick,
+    studentId: sid,
+    realName: name,
+    hydrogen: STARTING_HYDROGEN,
+    currentStar: 0,
+    bestStar: 0,
+    protectionScrolls: 0,
+    battleWins: 0,
+    battleLosses: 0,
+    unlockedCodex: ['0'],
+    items: {
+      stellar_wind: 0, hypergiant_core: 0, supernova_glow: 0,
+      neutron_crust: 0, pulsar_signal: 0, magnetar_flare: 0,
+      hawking_radiation: 0, dark_matter: 0,
     },
-  });
+    storedStars: {},
+    createdAt: now,
+  };
+  await db.ref().update(upd);
 
   const token = await createSession(userKey);
   res.json({ ok: true, token, userKey, nickname: nick });

@@ -227,6 +227,8 @@ async function profile(req, res) {
     bestStar: opp.bestStar || 0,
     battleWins: opp.battleWins || 0,
     battleLosses: opp.battleLosses || 0,
+    enhanceAttempts: opp.enhanceAttempts || 0,
+    enhanceDestroys: opp.enhanceDestroys || 0,
     isFriend: friendSnap.exists(),
     hasPendingRequest: pendingOutSnap.exists() || pendingInSnap.exists(),
   });

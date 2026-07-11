@@ -249,18 +249,14 @@ function updateUI(user) {
   // 방지권 정보
   const protRow = document.getElementById('protection-info-row');
   const protText = document.getElementById('protection-cost-text');
-  if (level <= 3) {
-    protText.textContent = '하락 없음';
-    protText.style.color = 'var(--success)';
-  } else if (stage.protectionCost === -1) {
-    protText.textContent = '방지 불가';
-    protText.style.color = 'var(--danger)';
-  } else if (stage.protectionCost > 0) {
+  if (stage.protectionCost > 0) {
     protText.textContent = `방지권 ${stage.protectionCost}개 필요 (보유: ${user.protectionScrolls || 0})`;
     protText.style.color = 'var(--text-sub)';
   } else {
-    protText.textContent = '-';
-    protText.style.color = 'var(--text-sub)';
+    // protectionCost 0(1~3강)과 -1(우주루트 일부 구간) 모두 방지권을 쓸 수 없고
+    // 실패하면 그대로 0강으로 복귀한다는 점에서 동일하게 취급한다.
+    protText.textContent = '방지 불가';
+    protText.style.color = 'var(--danger)';
   }
 
   // 별 보관 버튼 (+1강 이상이면 보관 가능)
@@ -424,14 +420,12 @@ async function advanceFailureFlow() {
     showToast(`${ITEM_NAMES[drop.key]} ${drop.amount}개를 획득했습니다.`);
   }
 
-  // 방지권 선택 (4강 이상이고 방지 가능한 단계)
+  // 방지권 선택 (방지 가능한 단계일 때만) - 1~3강도 다른 단계와 동일하게 실패하면 0강으로 복귀한다
   const failedLevel = pendingState.failedLevel;
   const failedStage = resolveStage(failedLevel, currentUser.track);
-  const needFallback = failedLevel >= 4; // 0~3강은 하락 없음
   const canProtect = failedStage.protectionCost > 0 && (currentUser.protectionScrolls || 0) >= failedStage.protectionCost;
 
-  if (needFallback) {
-    if (canProtect) {
+  if (canProtect) {
       // 방지권을 쓸 수 있는 경우엔 실패 안내 없이 방지권 선택 창만 표시.
       // 버튼 클릭 한 번으로 바로 결정 → 오버레이 닫힘 (확인 단계 없음)
       showOverlay('🛡 방지권 선택', '', '');
@@ -460,14 +454,10 @@ async function advanceFailureFlow() {
         document.getElementById('btn-enhance').disabled = false;
       };
       return;
-    } else {
-      // 방지권 없거나 방지 불가 단계 → 실패 안내 후 즉시 하락 처리
+  } else {
+      // 방지권 없거나 방지 불가 단계(1~3강 포함) - 실패 안내 후 즉시 하락 처리
       showOverlay('💥 강화 실패', 'fail', `${failedStage.name} (+${failedLevel}강) 강화에 실패했습니다.`);
       await applyFallback();
-    }
-  } else {
-    // 하락 없는 구간(0~3강) → 실패 안내만 표시
-    showOverlay('💥 강화 실패', 'fail', `${failedStage.name} (+${failedLevel}강) 강화에 실패했습니다.`);
   }
 
   // 3단계: 확인 버튼

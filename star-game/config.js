@@ -52,7 +52,7 @@ const ITEM_NAMES = {
 //   { type: 'star', level: N, amount: N }       같은 트랙에 보관된 별 소모
 //   null                                         강화 불가
 //
-// protectionCost: 0=하락 없음, N>0=방지권 N개로 하락 방지, -1=방지 불가
+// protectionCost: 0 또는 -1=방지권 사용 불가(실패 시 자동 0강 복귀), N>0=방지권 N개로 하락 방지
 // ============================================================
 const COMMON_STAGES = [
   {

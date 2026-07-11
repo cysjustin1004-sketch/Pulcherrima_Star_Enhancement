@@ -37,6 +37,7 @@
       <img class="star-img" id="profile-star-img" src="" alt="">
     </div>
     <div class="codex-modal-desc" id="profile-record" style="text-align:center;"></div>
+    <div class="codex-modal-desc" id="profile-stats" style="text-align:center; color:var(--text-sub);"></div>
     <div id="profile-battle-note" style="text-align:center; font-size:0.82rem; color:var(--text-sub); display:none;">친구만 배틀할 수 있습니다.</div>
     <button class="btn-primary mt-1" id="btn-goto-battle">⚔ 배틀하러 가기</button>
     <button class="btn-secondary w-100 mt-05" id="profile-modal-close">닫기</button>
@@ -176,6 +177,8 @@ async function openRankProfile(userKey) {
   document.getElementById('profile-star-name').textContent = stage.name;
   document.getElementById('profile-star-img').src = starImagePath(res.currentStar, res.track);
   document.getElementById('profile-record').textContent = `배틀 전적 ${res.battleWins}승 ${res.battleLosses}패`;
+  document.getElementById('profile-stats').textContent =
+    `최고 도달 +${res.bestStar}강 · 강화 시도 ${res.enhanceAttempts}회 · 파괴 ${res.enhanceDestroys}회 · 배틀 ${res.battleWins + res.battleLosses}전 ${res.battleWins}승`;
 
   const goBtn = document.getElementById('btn-goto-battle');
   const note  = document.getElementById('profile-battle-note');

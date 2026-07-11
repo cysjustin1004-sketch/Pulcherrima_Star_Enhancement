@@ -1,12 +1,18 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { resolveStage, stageKey, parseStageKey, ITEM_NAMES, TRACK_INFO, INVENTORY_CAP } = require('../../lib/game-config');
+const { resolveStage, stageKey, parseStageKey, ITEM_NAMES, TRACK_INFO, INVENTORY_CAP, RATE_LIMIT } = require('../../lib/game-config');
+const { isRateLimited } = require('../../lib/rate-limit');
 
 const TRACK_KEYS = Object.keys(TRACK_INFO);
 
 async function enhance(req, res) {
   const userKey = await validateSession(req);
   if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  // DB를 건드리기 전에 먼저 차단 — 매크로/스크립트가 남용해도 Firebase 부하로 이어지지 않는다
+  if (isRateLimited(userKey, RATE_LIMIT.maxPerMinute)) {
+    return res.status(429).json({ ok: false, error: '너무 빠른 요청입니다. 잠시 후 다시 시도하세요.' });
+  }
 
   const snap = await db.ref(`users/${userKey}`).get();
   if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저를 찾을 수 없습니다.' });
@@ -47,6 +53,9 @@ async function enhance(req, res) {
 
   // Firebase 일괄 업데이트 구성
   const upd = {};
+
+  // 강화 시도 횟수(성공/실패 무관) — 프로필 기록용
+  upd[`users/${userKey}/enhanceAttempts`] = (user.enhanceAttempts || 0) + 1;
 
   // 비용 차감
   if (cost.type === 'hydrogen') {
@@ -158,10 +167,11 @@ async function protection(req, res) {
     });
     res.json({ ok: true, currentStar: level, usedProtection: true });
   } else {
-    // 방지권 미사용 — +0으로 초기화
+    // 방지권 미사용 — +0으로 초기화 (프로필에 보여줄 "파괴 횟수" 집계)
     await db.ref().update({
       [`users/${userKey}/currentStar`]: 0,
       [`users/${userKey}/pendingFailure`]: null,
+      [`users/${userKey}/enhanceDestroys`]: (user.enhanceDestroys || 0) + 1,
     });
     res.json({ ok: true, currentStar: 0, usedProtection: false });
   }

@@ -26,6 +26,7 @@
       <div class="codex-modal-name" id="modal-name"></div>
       <div class="codex-modal-sub"  id="modal-sub"></div>
       <div class="codex-modal-desc" id="modal-desc"></div>
+      <button class="btn-primary" id="btn-set-profile-pic" style="width:100%; margin-bottom:0.5rem; display:none;"></button>
       <button class="btn-secondary codex-modal-close" style="width:100%;"
         onclick="document.getElementById('codex-modal-bg').classList.remove('visible')">닫기</button>
     </div>
@@ -178,11 +179,44 @@ function sectionKeys(sectionId) {
 }
 
 let unlockedSet = new Set();
+let currentProfilePicKey = null; // 유저가 프로필 사진으로 지정해둔 도감 항목의 stageKey
 
 // 모달이 현재 보여주는 단계 + 화살표 탐색용 상태
 let modalLevel = null;
 let modalTrack = null;
 let modalLastTrack = null; // +22강 이전(뒤로가기) 시 어느 트랙 21강으로 돌아갈지
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('show')));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 350); }, 2200);
+}
+
+/** 프로필 사진 버튼 — 잠긴 단계는 숨기고, 해금된 단계면 현재 지정 여부에 따라 설정/해제로 토글 */
+function updateProfilePicButton(level, track, isUnlocked) {
+  const btn = document.getElementById('btn-set-profile-pic');
+  if (!isUnlocked) {
+    btn.style.display = 'none';
+    return;
+  }
+  const key = stageKey(level, track);
+  const isCurrent = currentProfilePicKey === key;
+  btn.style.display = '';
+  btn.textContent = isCurrent ? '프로필 사진 해제 (기본값으로)' : '프로필 사진으로 설정';
+  btn.onclick = async () => {
+    const res = await setProfilePic(isCurrent ? null : key);
+    if (res.ok) {
+      currentProfilePicKey = res.profilePicKey;
+      showToast(isCurrent ? '프로필 사진을 기본값으로 되돌렸습니다.' : '프로필 사진으로 설정했습니다.');
+      updateProfilePicButton(level, track, isUnlocked);
+    } else {
+      showToast(res.error || '설정에 실패했습니다.');
+    }
+  };
+}
 
 function handleModalBgClick(e) {
   if (e.target === document.getElementById('codex-modal-bg')) {
@@ -218,6 +252,8 @@ function openEntry(level, track) {
     document.getElementById('modal-desc').textContent = '아직 해금되지 않은 단계입니다. 실제로 강화해서 도달하면 이름과 설명이 공개됩니다.';
     visualEl.innerHTML = `<div class="codex-modal-lock">?</div>`;
   }
+
+  updateProfilePicButton(level, track, isUnlocked);
 
   document.getElementById('modal-nav-prev').disabled = (level <= 0);
   document.getElementById('modal-nav-next').disabled = (level >= 29);
@@ -373,6 +409,7 @@ async function renderCodex() {
   unlockedSet = new Set((user.unlockedCodex || []).map(String));
   document.getElementById('unlock-count').textContent =
     `해금: ${unlockedSet.size} / ${TOTAL_ENTRIES}`;
+  currentProfilePicKey = user.profilePicKey || null;
 
   // +22강에서 뒤로 가기 안전장치 — 이번 탐색에서 트랙 페이지를 한 번도 안 봤다면
   // 실제로 배정된 내 트랙(user.track)으로 되돌아간다(스포일러 아님, 실제 진행 정보).

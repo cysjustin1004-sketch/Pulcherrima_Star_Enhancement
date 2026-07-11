@@ -175,7 +175,7 @@ async function openRankProfile(userKey) {
   document.getElementById('profile-star-level').textContent = `+${res.currentStar}강`;
   document.getElementById('profile-nickname').textContent = res.nickname;
   document.getElementById('profile-star-name').textContent = stage.name;
-  document.getElementById('profile-star-img').src = starImagePath(res.currentStar, res.track);
+  document.getElementById('profile-star-img').src = starImagePath(res.picLevel, res.picTrack);
   document.getElementById('profile-record').textContent = `배틀 전적 ${res.battleWins}승 ${res.battleLosses}패`;
   document.getElementById('profile-stats').textContent =
     `최고 도달 +${res.bestStar}강 · 강화 시도 ${res.enhanceAttempts}회 · 파괴 ${res.enhanceDestroys}회 · 배틀 ${res.battleWins + res.battleLosses}전 ${res.battleWins}승`;

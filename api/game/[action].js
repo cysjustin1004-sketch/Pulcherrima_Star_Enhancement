@@ -305,7 +305,38 @@ async function load(req, res) {
   res.json({ ok: true, level: newLevel, track: newTrack, autoStored: curLevel > 0 });
 }
 
-const ROUTES = { enhance, protection, sell, store, sellStored, load };
+async function setProfilePic(req, res) {
+  const userKey = await validateSession(req);
+  if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  const { key } = req.body;
+
+  if (key == null) {
+    // 해제 — 프로필 사진을 다시 현재 강화 중인 별로 되돌림
+    await db.ref(`users/${userKey}/profilePicKey`).remove();
+    return res.json({ ok: true, profilePicKey: null });
+  }
+
+  const snap = await db.ref(`users/${userKey}`).get();
+  if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+
+  const user = snap.val();
+  const unlocked = user.unlockedCodex || [];
+  // 해금하지 않은 도감 항목을 프로필 사진으로 지정하지 못하도록 서버에서도 검증
+  if (!unlocked.includes(key)) {
+    return res.status(400).json({ ok: false, error: '아직 해금하지 않은 별입니다.' });
+  }
+
+  const { level, track } = parseStageKey(key);
+  if (!resolveStage(level, track)) {
+    return res.status(400).json({ ok: false, error: '유효하지 않은 별입니다.' });
+  }
+
+  await db.ref(`users/${userKey}/profilePicKey`).set(key);
+  res.json({ ok: true, profilePicKey: key });
+}
+
+const ROUTES = { enhance, protection, sell, store, sellStored, load, setProfilePic };
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();

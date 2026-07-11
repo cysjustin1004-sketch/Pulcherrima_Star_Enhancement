@@ -219,11 +219,26 @@ async function profile(req, res) {
     db.ref(`friendRequests/${userKey}/${opponentKey}`).get(), // 상대가 나에게 보낸 요청
   ]);
 
+  // 프로필 사진 — 유저가 도감에서 직접 골라둔 별이 있으면 그걸, 없으면 현재 강화 중인
+  // 별을 기본값으로 쓴다. 여러 명이 동시에 강화하는 상황에서 사진이 계속 바뀌는 걸
+  // 막기 위해 currentStar와는 별개로 고정된 사진을 보여주기 위함.
+  let picLevel = opp.currentStar || 0;
+  let picTrack = opp.track || null;
+  if (opp.profilePicKey) {
+    const picStage = parseStageKey(opp.profilePicKey);
+    if (resolveStage(picStage.level, picStage.track)) {
+      picLevel = picStage.level;
+      picTrack = picStage.track;
+    }
+  }
+
   res.json({
     ok: true,
     nickname: opp.nickname,
     currentStar: opp.currentStar || 0,
     track: opp.track || null,
+    picLevel,
+    picTrack,
     bestStar: opp.bestStar || 0,
     battleWins: opp.battleWins || 0,
     battleLosses: opp.battleLosses || 0,

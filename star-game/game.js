@@ -97,6 +97,12 @@ async function loadStoredStar(key) {
   return apiCall('/api/game/load', { key });
 }
 
+// ─── 프로필 사진 (도감에서 해금한 별 중 직접 선택) ────────────────
+
+async function setProfilePic(key) {
+  return apiCall('/api/game/setProfilePic', { key });
+}
+
 // ─── 숫자 포맷 ───────────────────────────────────────────────
 
 function formatNumber(n) {

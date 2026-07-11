@@ -225,8 +225,8 @@ function updateUI(user) {
   document.getElementById('enhance-info-card').style.display = '';
   document.getElementById('legend-card').style.display      = 'none';
 
-  // 다음 단계 이름 (16→17은 트랙이 무작위 배정되므로 이름을 미리 알 수 없음)
-  if (level === 16) {
+  // 다음 단계 이름 (13→14는 트랙이 무작위 배정되므로 이름을 미리 알 수 없음)
+  if (level === 13) {
     document.getElementById('next-star-name').textContent = '??? (무작위 트랙 배정)';
   } else {
     const nextStage = resolveStage(level + 1, user.track);

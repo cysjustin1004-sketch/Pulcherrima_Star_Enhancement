@@ -379,12 +379,12 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
       if (stage.cost.type === 'hydrogen') currentUser.hydrogen = Math.max(0, (currentUser.hydrogen || 0) - stage.cost.amount);
       else if (stage.cost.type === 'item' && currentUser.items) currentUser.items[stage.cost.key] = Math.max(0, (currentUser.items[stage.cost.key] || 0) - stage.cost.amount);
       else if (stage.cost.type === 'star') {
-        // 서버와 동일하게 트랙 무관 — 여러 트랙에 나뉘어 있으면 순서대로 차감
+        // 서버와 동일하게 트랙 무관 — 여러 트랙(+ 트랙 접두어 없는 우주루트 별)에 나뉘어 있으면 순서대로 차감
         if (!currentUser.storedStars) currentUser.storedStars = {};
         let remaining = stage.cost.amount;
-        for (const t of Object.keys(TRACK_INFO)) {
+        const keys = [...Object.keys(TRACK_INFO).map(t => `${t}_${stage.cost.level}`), String(stage.cost.level)];
+        for (const k of keys) {
           if (remaining <= 0) break;
-          const k = `${t}_${stage.cost.level}`;
           const have = currentUser.storedStars[k] || 0;
           if (have <= 0) continue;
           const take = Math.min(have, remaining);

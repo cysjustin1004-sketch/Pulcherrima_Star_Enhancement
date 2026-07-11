@@ -32,8 +32,12 @@ async function enhance(req, res) {
     if (held < cost.amount)
       return res.status(400).json({ ok: false, error: `${ITEM_NAMES[cost.key]}이(가) ${cost.amount}개 필요합니다.` });
   } else if (cost.type === 'star') {
-    // 트랙 무관하게 인정 — 트랙이 매번 랜덤 배정되므로 어느 트랙에서 보관했든 레벨만 맞으면 재료로 인정
-    const stored = TRACK_KEYS.reduce((sum, t) => sum + ((user.storedStars && user.storedStars[`${t}_${cost.level}`]) || 0), 0);
+    // 트랙 무관하게 인정 — 트랙이 매번 랜덤 배정되므로 어느 트랙에서 보관했든 레벨만 맞으면 재료로 인정.
+    // stageKey는 공통(0~13)·우주루트(22강 이상) 별을 트랙 접두어 없는 순수 레벨 키("22")로
+    // 저장하므로, track1_22 등 접두어 키만 더하면 그 구간 별은 항상 0으로 잡혀 보유 중이어도
+    // 재료 부족으로 오판된다 — 접두어 없는 키도 함께 더한다.
+    const stored = TRACK_KEYS.reduce((sum, t) => sum + ((user.storedStars && user.storedStars[`${t}_${cost.level}`]) || 0), 0)
+      + ((user.storedStars && user.storedStars[String(cost.level)]) || 0);
     if (stored < cost.amount)
       return res.status(400).json({ ok: false, error: `+${cost.level}강 별이 ${cost.amount}개 필요합니다.` });
   }
@@ -51,11 +55,11 @@ async function enhance(req, res) {
     const held = (user.items && user.items[cost.key]) || 0;
     upd[`users/${userKey}/items/${cost.key}`] = held - cost.amount;
   } else if (cost.type === 'star') {
-    // 여러 트랙에 나뉘어 보관돼 있을 수 있으므로 트랙 순서대로 필요한 만큼 차감
+    // 여러 트랙(+ 트랙 접두어 없는 우주루트 별)에 나뉘어 보관돼 있을 수 있으므로 순서대로 필요한 만큼 차감
     let remaining = cost.amount;
-    for (const t of TRACK_KEYS) {
+    const keys = [...TRACK_KEYS.map(t => `${t}_${cost.level}`), String(cost.level)];
+    for (const k of keys) {
       if (remaining <= 0) break;
-      const k = `${t}_${cost.level}`;
       const have = (user.storedStars && user.storedStars[k]) || 0;
       if (have <= 0) continue;
       const take = Math.min(have, remaining);

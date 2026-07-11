@@ -21,10 +21,16 @@ async function apiCall(path, body) {
 
 // ─── 비용 사전 검증 (로컬, UI용) ────────────────────────────
 
-/** 트랙이 매번 랜덤 배정되므로, 별 재료는 트랙 무관하게 레벨만 맞으면 인정 */
+/**
+ * 트랙이 매번 랜덤 배정되므로, 별 재료는 트랙 무관하게 레벨만 맞으면 인정.
+ * stageKey는 공통(0~13)·우주루트(22강 이상) 별은 트랙 접두어 없이 "22" 같은 순수 레벨
+ * 문자열 키로 저장하므로(lib/game-config.js의 stageKey 참고), track1_22 등만 훑으면
+ * 그 구간 별의 보유량이 항상 0으로 잡힌다 — 접두어 없는 키도 함께 더해야 한다.
+ */
 function sumStoredStarAcrossTracks(storedStars, level) {
   if (!storedStars) return 0;
-  return Object.keys(TRACK_INFO).reduce((sum, t) => sum + (storedStars[`${t}_${level}`] || 0), 0);
+  const trackSum = Object.keys(TRACK_INFO).reduce((sum, t) => sum + (storedStars[`${t}_${level}`] || 0), 0);
+  return trackSum + (storedStars[String(level)] || 0);
 }
 
 function checkCost(user, cost) {

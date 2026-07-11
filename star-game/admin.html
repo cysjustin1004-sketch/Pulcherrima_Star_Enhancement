@@ -185,15 +185,17 @@ async function loadUsers() {
           💧 ${formatNumber(user.hydrogen || 0)} · ⭐ +${user.currentStar || 0} · 최고 +${user.bestStar || 0} · 방지권 ${user.protectionScrolls || 0}
         </div>
       </div>
-      <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+      <div style="display:flex;gap:0.4rem;flex-shrink:0;flex-wrap:wrap;">
         <button class="btn-outline" style="font-size:0.78rem; padding:0.4rem 0.7rem;">로그</button>
         <button class="${isBanned ? 'btn-secondary' : 'btn-danger'}" style="font-size:0.78rem; padding:0.4rem 0.7rem;">${isBanned ? '벤 해제' : '벤'}</button>
+        <button class="btn-danger" style="font-size:0.78rem; padding:0.4rem 0.7rem;">삭제</button>
       </div>
     `;
 
-    const [btnLog, btnBan] = row.querySelectorAll('button');
+    const [btnLog, btnBan, btnDelete] = row.querySelectorAll('button');
     btnLog.addEventListener('click', () => viewLogs(user.key, user.nickname || user.key));
     btnBan.addEventListener('click', () => toggleBan(user.key, user.nickname || user.key, isBanned));
+    btnDelete.addEventListener('click', () => deleteUser(user.key, user.nickname || user.key));
 
     userList.appendChild(row);
   });
@@ -295,6 +297,33 @@ async function toggleBan(userKey, nickname, currentlyBanned) {
     await loadUsers();
   } else {
     showToast(data.error || '처리 실패');
+  }
+}
+
+// ─── 계정 삭제 (벤과 달리 되돌릴 수 없음) ────────────
+
+async function deleteUser(userKey, nickname) {
+  const input = prompt(`${nickname} 님 계정을 완전히 삭제합니다. 되돌릴 수 없습니다.\n계속하려면 닉네임을 정확히 입력하세요: ${nickname}`);
+  if (input !== nickname) {
+    if (input !== null) showToast('닉네임이 일치하지 않아 취소되었습니다.');
+    return;
+  }
+
+  const res = await fetch('/api/admin/delete-user', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'X-Admin-Token': adminToken || '',
+    },
+    body: JSON.stringify({ userKey, confirm: nickname }),
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    showToast(`${nickname} 계정이 삭제되었습니다.`);
+    await loadUsers();
+  } else {
+    showToast(data.error || '삭제 실패');
   }
 }
 

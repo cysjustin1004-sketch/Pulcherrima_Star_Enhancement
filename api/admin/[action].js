@@ -76,6 +76,76 @@ async function ban(req, res) {
   res.json({ ok: true, userKey, banned });
 }
 
+function convId(a, b) {
+  return [a, b].sort().join('__');
+}
+
+// 계정을 완전히 삭제한다(벤과 달리 되돌릴 수 없음). 친구/친구요청/대화는 양쪽 계정에
+// 각각 저장되므로, 삭제 대상 쪽만 지우면 상대방 화면에 "존재하지 않는 유저"가 유령
+// 친구로 남는다 — 그래서 상대방 쪽 역방향 링크와 대화 내역도 함께 정리한다.
+async function deleteUser(req, res) {
+  if (!await validateAdmin(req)) {
+    return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
+  }
+
+  const { userKey, confirm } = req.body;
+  if (!userKey) {
+    return res.status(400).json({ ok: false, error: 'userKey를 입력하세요.' });
+  }
+
+  const snap = await db.ref(`users/${userKey}`).get();
+  if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+  const user = snap.val();
+
+  // 오조작 방지 — 닉네임을 정확히 입력해야 실제로 삭제된다
+  if (confirm !== user.nickname) {
+    return res.status(400).json({ ok: false, error: '확인 문구(닉네임)가 일치하지 않습니다.' });
+  }
+
+  const [friendsSnap, reqInSnap, reqOutSnap] = await Promise.all([
+    db.ref(`friends/${userKey}`).get(),
+    db.ref(`friendRequests/${userKey}`).get(),
+    db.ref(`friendRequestsSent/${userKey}`).get(),
+  ]);
+
+  const upd = {
+    [`users/${userKey}`]: null,
+    [`authSecrets/${userKey}`]: null,
+    [`enhanceLogs/${userKey}`]: null,
+    [`battleLogs/${userKey}`]: null,
+    [`battleCounters/${userKey}`]: null,
+    [`messageIndex/${userKey}`]: null,
+    [`friends/${userKey}`]: null,
+    [`friendRequests/${userKey}`]: null,
+    [`friendRequestsSent/${userKey}`]: null,
+  };
+
+  // 친구 목록에 있던 상대방 쪽의 역방향 링크·대화 인덱스·대화 내용도 함께 정리
+  if (friendsSnap.exists()) {
+    friendsSnap.forEach(child => {
+      const otherKey = child.key;
+      upd[`friends/${otherKey}/${userKey}`] = null;
+      upd[`messageIndex/${otherKey}/${userKey}`] = null;
+      upd[`messages/${convId(userKey, otherKey)}`] = null;
+    });
+  }
+  // 이 유저에게 온 친구 요청 → 보낸 사람의 "보낸 요청" 기록도 정리
+  if (reqInSnap.exists()) {
+    reqInSnap.forEach(child => {
+      upd[`friendRequestsSent/${child.key}/${userKey}`] = null;
+    });
+  }
+  // 이 유저가 보낸 친구 요청 → 받은 사람의 "받은 요청" 기록도 정리
+  if (reqOutSnap.exists()) {
+    reqOutSnap.forEach(child => {
+      upd[`friendRequests/${child.key}/${userKey}`] = null;
+    });
+  }
+
+  await db.ref().update(upd);
+  res.json({ ok: true, userKey, nickname: user.nickname });
+}
+
 async function wipeUsers(req, res) {
   if (!await validateAdmin(req)) {
     return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
@@ -164,6 +234,7 @@ const ROUTES = {
   'verify': verify,
   'give-hydrogen': giveHydrogen,
   'ban': ban,
+  'delete-user': deleteUser,
   'wipe-users': wipeUsers,
   'migrate-secrets': migrateSecrets,
   'create-cheat-account': createCheatAccount,

@@ -232,6 +232,15 @@ async function profile(req, res) {
     }
   }
 
+  // bestTrack이 도입되기 전(커밋 7e8a90f 이전)에 이미 14~21강을 찍은 레거시 계정은
+  // bestTrack이 비어 있어 resolveStage(bestStar, null)이 실패 → 클라이언트가
+  // COMMON_STAGES[0](거대 분자운)으로 잘못 대체 표시하는 문제가 있었다. 트랙은
+  // 13→14강 전환 때만 바뀌므로, 현재 track을 최선의 추정치로 채워 넣는다.
+  let bestTrack = opp.bestTrack || null;
+  if (!bestTrack && opp.bestStar >= 14 && opp.bestStar <= 21) {
+    bestTrack = opp.track || null;
+  }
+
   res.json({
     ok: true,
     nickname: opp.nickname,
@@ -240,7 +249,7 @@ async function profile(req, res) {
     picLevel,
     picTrack,
     bestStar: opp.bestStar || 0,
-    bestTrack: opp.bestTrack || null,
+    bestTrack,
     battleWins: opp.battleWins || 0,
     battleLosses: opp.battleLosses || 0,
     enhanceAttempts: opp.enhanceAttempts || 0,

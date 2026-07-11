@@ -53,17 +53,35 @@
 
 <!-- ───────────────── 상대 프로필 모달 ───────────────── -->
 <div class="codex-modal-bg" id="profile-modal-bg">
-  <div class="codex-modal">
+  <div class="codex-modal" style="position:relative;">
+    <button class="modal-close-x" id="profile-modal-close" aria-label="닫기">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 5L19 19M19 5L5 19" stroke="black" stroke-width="2.5" stroke-linecap="round"/></svg>
+    </button>
     <div class="codex-modal-level" id="profile-star-level"></div>
     <div class="codex-modal-name" id="profile-nickname"></div>
     <div class="codex-modal-sub" id="profile-star-name"></div>
     <div class="star-visual" style="margin:1rem auto;">
       <img class="star-img" id="profile-star-img" src="" alt="">
     </div>
-    <div class="codex-modal-desc" id="profile-record" style="text-align:center;"></div>
-    <div class="codex-modal-desc" id="profile-stats" style="text-align:center; color:var(--text-sub);"></div>
     <button class="btn-primary mt-1" id="btn-goto-battle">⚔ 배틀하러 가기</button>
-    <button class="btn-secondary w-100 mt-05" id="profile-modal-close">닫기</button>
+
+    <div class="profile-stat-block">
+      <div class="profile-stat-label">강화 최고 단계</div>
+      <img class="profile-stat-img" id="profile-best-img" src="" alt="">
+      <div class="profile-stat-sub" id="profile-best-text"></div>
+    </div>
+    <div class="profile-stat-block">
+      <div class="profile-stat-label">강화 시도</div>
+      <div class="profile-stat-value" id="profile-attempts-text"></div>
+    </div>
+    <div class="profile-stat-block">
+      <div class="profile-stat-label">강화 파괴</div>
+      <div class="profile-stat-value" id="profile-destroys-text"></div>
+    </div>
+    <div class="profile-stat-block">
+      <div class="profile-stat-label">배틀</div>
+      <div class="profile-stat-value" id="profile-battle-text"></div>
+    </div>
   </div>
 </div>
 
@@ -361,9 +379,13 @@ async function openProfile(key) {
   document.getElementById('profile-nickname').textContent = res.nickname;
   document.getElementById('profile-star-name').textContent = stage.name;
   document.getElementById('profile-star-img').src = starImagePath(res.picLevel, res.picTrack);
-  document.getElementById('profile-record').textContent = `배틀 전적 ${res.battleWins}승 ${res.battleLosses}패`;
-  document.getElementById('profile-stats').textContent =
-    `최고 도달 +${res.bestStar}강 · 강화 시도 ${res.enhanceAttempts}회 · 파괴 ${res.enhanceDestroys}회 · 배틀 ${res.battleWins + res.battleLosses}전 ${res.battleWins}승`;
+
+  const bestStage = resolveStage(res.bestStar, res.bestTrack) || COMMON_STAGES[0];
+  document.getElementById('profile-best-img').src = starImagePath(res.bestStar, res.bestTrack);
+  document.getElementById('profile-best-text').textContent = `${bestStage.name}, +${res.bestStar}강`;
+  document.getElementById('profile-attempts-text').textContent = `${res.enhanceAttempts}회`;
+  document.getElementById('profile-destroys-text').textContent = `${res.enhanceDestroys}회`;
+  document.getElementById('profile-battle-text').textContent = `${res.battleWins + res.battleLosses}전 ${res.battleWins}승`;
   document.getElementById('btn-goto-battle').onclick = () => {
     location.href = `battle.html?with=${encodeURIComponent(key)}`;
   };

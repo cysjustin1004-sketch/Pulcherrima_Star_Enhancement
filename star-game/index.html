@@ -20,7 +20,43 @@
     </div>
     <div class="top-header-title">별 강화하기</div>
   </div>
-  <button class="top-header-logout" id="btn-logout">🚪 로그아웃</button>
+  <div class="top-header-actions">
+    <button class="top-header-profile-btn" id="btn-my-profile">내 프로필</button>
+    <button class="top-header-logout" id="btn-logout">🚪 로그아웃</button>
+  </div>
+</div>
+
+<!-- ───────────────── 내 프로필 모달 ───────────────── -->
+<div class="codex-modal-bg" id="profile-modal-bg">
+  <div class="codex-modal" style="position:relative;">
+    <button class="modal-close-x" id="profile-modal-close" aria-label="닫기">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 5L19 19M19 5L5 19" stroke="black" stroke-width="2.5" stroke-linecap="round"/></svg>
+    </button>
+    <div class="codex-modal-level" id="profile-star-level"></div>
+    <div class="codex-modal-name" id="profile-nickname"></div>
+    <div class="codex-modal-sub" id="profile-star-name"></div>
+    <div class="star-visual" style="margin:1rem auto;">
+      <img class="star-img" id="profile-star-img" src="" alt="">
+    </div>
+
+    <div class="profile-stat-block">
+      <div class="profile-stat-label">강화 최고 단계</div>
+      <img class="profile-stat-img" id="profile-best-img" src="" alt="">
+      <div class="profile-stat-sub" id="profile-best-text"></div>
+    </div>
+    <div class="profile-stat-block">
+      <div class="profile-stat-label">강화 시도</div>
+      <div class="profile-stat-value" id="profile-attempts-text"></div>
+    </div>
+    <div class="profile-stat-block">
+      <div class="profile-stat-label">강화 파괴</div>
+      <div class="profile-stat-value" id="profile-destroys-text"></div>
+    </div>
+    <div class="profile-stat-block">
+      <div class="profile-stat-label">배틀</div>
+      <div class="profile-stat-value" id="profile-battle-text"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ───────────────── 강화 결과 오버레이 ───────────────── -->
@@ -504,6 +540,33 @@ document.getElementById('btn-store').addEventListener('click', async () => {
   } else {
     showToast(result.error || '보관 오류');
   }
+});
+
+// ─── 내 프로필 ──────────────────────────────────────
+
+async function openMyProfile() {
+  const res = await apiCall('/api/battle/profile', { opponentKey: session.userKey });
+  if (!res.ok) { showToast(res.error || '프로필을 불러오지 못했습니다.'); return; }
+
+  const stage = resolveStage(res.currentStar, res.track) || COMMON_STAGES[0];
+  document.getElementById('profile-star-level').textContent = `+${res.currentStar}강`;
+  document.getElementById('profile-nickname').textContent = res.nickname;
+  document.getElementById('profile-star-name').textContent = stage.name;
+  document.getElementById('profile-star-img').src = starImagePath(res.picLevel, res.picTrack);
+
+  const bestStage = resolveStage(res.bestStar, res.bestTrack) || COMMON_STAGES[0];
+  document.getElementById('profile-best-img').src = starImagePath(res.bestStar, res.bestTrack);
+  document.getElementById('profile-best-text').textContent = `${bestStage.name}, +${res.bestStar}강`;
+  document.getElementById('profile-attempts-text').textContent = `${res.enhanceAttempts}회`;
+  document.getElementById('profile-destroys-text').textContent = `${res.enhanceDestroys}회`;
+  document.getElementById('profile-battle-text').textContent = `${res.battleWins + res.battleLosses}전 ${res.battleWins}승`;
+
+  document.getElementById('profile-modal-bg').classList.add('visible');
+}
+
+document.getElementById('btn-my-profile').addEventListener('click', openMyProfile);
+document.getElementById('profile-modal-close').addEventListener('click', () => {
+  document.getElementById('profile-modal-bg').classList.remove('visible');
 });
 
 // ─── 로그아웃 ──────────────────────────────────────

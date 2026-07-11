@@ -240,6 +240,7 @@ async function profile(req, res) {
     picLevel,
     picTrack,
     bestStar: opp.bestStar || 0,
+    bestTrack: opp.bestTrack || null,
     battleWins: opp.battleWins || 0,
     battleLosses: opp.battleLosses || 0,
     enhanceAttempts: opp.enhanceAttempts || 0,

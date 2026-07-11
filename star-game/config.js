@@ -597,7 +597,7 @@ const RECIPES = [
 ];
 
 // 레이트리밋 (분당 최대 강화 횟수)
-const RATE_LIMIT = { maxPerMinute: 130 };
+const RATE_LIMIT = { maxPerMinute: 150 };
 
 // 신규 유저 시작 수소
 const STARTING_HYDROGEN = 2000000;

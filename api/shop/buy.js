@@ -33,9 +33,9 @@ module.exports = async (req, res) => {
   let warpSuccess = null;
 
   if (item.type === 'warp') {
-    // 도약권은 확률제(1/3) — 가격은 시도한 것만으로 항상 소모되고, 실패하면
+    // 도약권은 아이템별 성공 확률제 — 가격은 시도한 것만으로 항상 소모되고, 실패하면
     // 수소만 잃고 현재 단계는 그대로 유지된다(강화 실패처럼 0강으로 떨어지지 않음).
-    warpSuccess = Math.random() < (1 / 3);
+    warpSuccess = Math.random() < item.successRate;
     if (warpSuccess) {
       // currentStar를 해당 레벨로 설정. 공통구간(0~13강)을 넘어서는 도약이면
       // 강화로 13→14강을 넘을 때와 동일하게 트랙을 무작위로 새로 배정해야 한다.

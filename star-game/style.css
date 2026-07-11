@@ -901,8 +901,6 @@ input::placeholder { color: #9a9a9a; }
   box-shadow: none;
   opacity: 0.5;
 }
-.item-slot.warn { border-color: var(--danger); }
-
 .item-slot-img {
   width: 34px;
   height: 34px;
@@ -929,12 +927,6 @@ input::placeholder { color: #9a9a9a; }
   font-size: 0.58rem;
   font-weight: 900;
   padding: 1px 4px;
-}
-.item-slot-warn {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 0.7rem;
 }
 .inv-empty-note {
   grid-column: 1 / -1;

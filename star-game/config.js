@@ -596,13 +596,6 @@ const RECIPES = [
   },
 ];
 
-// 절대 조합하면 안 되는 아이템 경고 (레시피 r7/r8/r9 재료)
-const IMPORTANT_ITEM_WARNINGS = {
-  [ITEM_KEYS.MAGNETAR_FLARE]: '[경고] 조합 재료(4개) — 함부로 교환하지 마세요!',
-  [ITEM_KEYS.HAWKING]:        '[경고] 조합 재료(6개) — 함부로 교환하지 마세요!',
-  [ITEM_KEYS.DARK_MATTER]:    '[경고] 조합 재료(4개) — 함부로 교환하지 마세요!',
-};
-
 // 레이트리밋 (분당 최대 강화 횟수)
 const RATE_LIMIT = { maxPerMinute: 50 };
 

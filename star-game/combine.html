@@ -109,16 +109,13 @@ function renderAll(user) {
   let heldCount = 0;
   Object.entries(ITEM_NAMES).forEach(([key, name]) => {
     const count = (user.items && user.items[key]) || 0;
-    const warning = IMPORTANT_ITEM_WARNINGS[key] || '';
     if (count > 0) heldCount++;
 
     const slot = document.createElement('div');
-    slot.className = 'item-slot' + (count === 0 ? ' empty' : '') + (warning && count > 0 ? ' warn' : '');
-    if (warning && count > 0) slot.title = warning;
+    slot.className = 'item-slot' + (count === 0 ? ' empty' : '');
     slot.innerHTML = `
       <div class="item-slot-name">${name}</div>
       <div class="item-slot-count">${count}개</div>
-      ${warning && count > 0 ? '<div class="item-slot-warn">!</div>' : ''}
     `;
     invList.appendChild(slot);
   });

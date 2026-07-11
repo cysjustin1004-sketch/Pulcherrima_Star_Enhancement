@@ -150,6 +150,7 @@ function renderAll(user) {
         <div class="item-slot-badge">+${level}</div>
         <img class="item-slot-img" src="${starImagePath(level, track)}" alt="">
         <div class="item-slot-name">${stage ? stage.name : '?'}</div>
+        ${track ? `<div class="item-slot-track">(${TRACK_INFO[track].name})</div>` : ''}
         <div class="item-slot-count">${cnt}개</div>
         ${usage.length ? `<div class="material-usage-note">${usage[0]} 재료</div>` : ''}
         <div class="item-slot-actions" style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.4rem; width:100%;">

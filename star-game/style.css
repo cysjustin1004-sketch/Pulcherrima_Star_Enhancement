@@ -977,6 +977,12 @@ input::placeholder { color: #9a9a9a; }
   color: var(--text);
   word-break: keep-all;
 }
+.item-slot-track {
+  font-size: 0.56rem;
+  font-weight: 500;
+  color: var(--text-sub);
+  word-break: keep-all;
+}
 .item-slot-count {
   font-size: 0.7rem;
   font-weight: 900;

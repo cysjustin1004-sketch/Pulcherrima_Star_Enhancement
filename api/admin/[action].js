@@ -156,10 +156,23 @@ async function wipeUsers(req, res) {
     return res.status(400).json({ ok: false, error: '확인 문구가 일치하지 않습니다.' });
   }
 
+  // users/enhanceLogs/authSecrets만 지우던 시절 만들어진 버튼이라, 그 뒤 추가된
+  // 친구·메시지·배틀·학번 관련 최상위 노드는 그대로 남아있었다. userKey가 닉네임에서
+  // 결정적으로 파생되므로, 지운 뒤 같은 닉네임으로 재가입하면 옛 친구/대화/배틀 기록을
+  // 그대로 물려받고, 학번은 studentIds 인덱스가 안 지워져 정당한 재가입도 막혔다.
+  // adminSessions·config/admin(관리자 비밀번호)는 관리자 세션이 끊기지 않도록 보존.
   await db.ref().update({
     users: null,
     enhanceLogs: null,
     authSecrets: null,
+    studentIds: null,
+    friends: null,
+    friendRequests: null,
+    friendRequestsSent: null,
+    messageIndex: null,
+    messages: null,
+    battleLogs: null,
+    battleCounters: null,
   });
 
   res.json({ ok: true });

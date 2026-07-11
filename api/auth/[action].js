@@ -9,7 +9,11 @@ async function login(req, res) {
   }
 
   const userKey = nicknameToKey(nickname);
-  const snap = await db.ref(`users/${userKey}`).get();
+  // users/authSecrets는 서로 의존관계 없는 조회라 병렬로 (기존엔 순차 await 2번)
+  const [snap, secretSnap] = await Promise.all([
+    db.ref(`users/${userKey}`).get(),
+    db.ref(`authSecrets/${userKey}`).get(),
+  ]);
   if (!snap.exists()) {
     return res.status(401).json({ ok: false, error: '존재하지 않는 닉네임입니다.' });
   }
@@ -19,7 +23,6 @@ async function login(req, res) {
     return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
   }
 
-  const secretSnap = await db.ref(`authSecrets/${userKey}`).get();
   let storedHash = secretSnap.exists() ? secretSnap.val().passwordHash : null;
 
   // 마이그레이션: 과거 스키마(users/$uid.passwordHash, 공개 읽기 경로)에 남아있는
@@ -58,23 +61,27 @@ async function register(req, res) {
   }
 
   const now = Date.now();
-  await db.ref(`authSecrets/${userKey}`).set({ passwordHash });
-  await db.ref(`users/${userKey}`).set({
-    nickname: nick,
-    hydrogen: STARTING_HYDROGEN,
-    currentStar: 0,
-    bestStar: 0,
-    protectionScrolls: 0,
-    battleWins: 0,
-    battleLosses: 0,
-    unlockedCodex: ['0'],
-    items: {
-      stellar_wind: 0, hypergiant_core: 0, supernova_glow: 0,
-      neutron_crust: 0, pulsar_signal: 0, magnetar_flare: 0,
-      hawking_radiation: 0, dark_matter: 0,
+  // authSecrets/users 두 쓰기를 하나의 update()로 묶어 왕복 횟수를 줄이고,
+  // 둘 중 하나만 반영된 채 끊기는 중간 상태의 가능성도 함께 줄인다.
+  await db.ref().update({
+    [`authSecrets/${userKey}`]: { passwordHash },
+    [`users/${userKey}`]: {
+      nickname: nick,
+      hydrogen: STARTING_HYDROGEN,
+      currentStar: 0,
+      bestStar: 0,
+      protectionScrolls: 0,
+      battleWins: 0,
+      battleLosses: 0,
+      unlockedCodex: ['0'],
+      items: {
+        stellar_wind: 0, hypergiant_core: 0, supernova_glow: 0,
+        neutron_crust: 0, pulsar_signal: 0, magnetar_flare: 0,
+        hawking_radiation: 0, dark_matter: 0,
+      },
+      storedStars: {},
+      createdAt: now,
     },
-    storedStars: {},
-    createdAt: now,
   });
 
   const token = await createSession(userKey);

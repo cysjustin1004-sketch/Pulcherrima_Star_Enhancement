@@ -27,17 +27,22 @@ async function preview(req, res) {
   if (!opponentKey) return res.status(400).json({ ok: false, error: '상대를 지정하세요.' });
   if (opponentKey === userKey) return res.status(400).json({ ok: false, error: '자기 자신과는 배틀할 수 없습니다.' });
 
-  const meSnap = await db.ref(`users/${userKey}`).get();
+  // 서로 의존관계 없는 조회 4개를 한 번에 병렬로 (기존엔 순차 await 4번)
+  const [meSnap, friendSnap, oppSnap, counterSnap] = await Promise.all([
+    db.ref(`users/${userKey}`).get(),
+    db.ref(`friends/${userKey}/${opponentKey}`).get(),
+    db.ref(`users/${opponentKey}`).get(),
+    db.ref(`battleCounters/${userKey}/${opponentKey}/${todayUTCBucket()}`).get(),
+  ]);
+
   if (!meSnap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
   const me = meSnap.val();
   if (me.banned) return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
 
-  const friendSnap = await db.ref(`friends/${userKey}/${opponentKey}`).get();
   if (!friendSnap.exists()) {
     return res.status(403).json({ ok: false, error: '친구만 배틀할 수 있습니다.' });
   }
 
-  const oppSnap = await db.ref(`users/${opponentKey}`).get();
   if (!oppSnap.exists()) return res.status(404).json({ ok: false, error: '상대를 찾을 수 없습니다.' });
   const opp = oppSnap.val();
   if (opp.banned) return res.status(403).json({ ok: false, error: '정지된 사용자입니다.' });
@@ -47,7 +52,6 @@ async function preview(req, res) {
 
   const winProb = battleWinProb(myBattle.level, oppBattle.level);
 
-  const counterSnap = await db.ref(`battleCounters/${userKey}/${opponentKey}/${todayUTCBucket()}`).get();
   const usedToday = counterSnap.exists() ? counterSnap.val() : 0;
   const remainingToday = Math.max(0, BATTLE_DAILY_CAP - usedToday);
 
@@ -82,16 +86,20 @@ async function execute(req, res) {
   if (!opponentKey) return res.status(400).json({ ok: false, error: '상대를 지정하세요.' });
   if (opponentKey === userKey) return res.status(400).json({ ok: false, error: '자기 자신과는 배틀할 수 없습니다.' });
 
-  const meSnap = await db.ref(`users/${userKey}`).get();
+  // 서로 의존관계 없는 조회 3개를 한 번에 병렬로 (기존엔 순차 await 3번)
+  const [meSnap, friendSnap, oppSnap] = await Promise.all([
+    db.ref(`users/${userKey}`).get(),
+    db.ref(`friends/${userKey}/${opponentKey}`).get(),
+    db.ref(`users/${opponentKey}`).get(),
+  ]);
+
   if (!meSnap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
   if (meSnap.val().banned) return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
 
-  const friendSnap = await db.ref(`friends/${userKey}/${opponentKey}`).get();
   if (!friendSnap.exists()) {
     return res.status(403).json({ ok: false, error: '친구만 배틀할 수 있습니다.' });
   }
 
-  const oppSnap = await db.ref(`users/${opponentKey}`).get();
   if (!oppSnap.exists()) return res.status(404).json({ ok: false, error: '상대를 찾을 수 없습니다.' });
   if (oppSnap.val().banned) return res.status(403).json({ ok: false, error: '정지된 사용자입니다.' });
 
@@ -106,13 +114,10 @@ async function execute(req, res) {
     return res.status(429).json({ ok: false, error: '오늘 이 상대와의 배틀 횟수를 모두 사용했습니다.' });
   }
 
-  // ── 최신 상태 재조회 ──
-  const [meSnap2, oppSnap2] = await Promise.all([
-    db.ref(`users/${userKey}`).get(),
-    db.ref(`users/${opponentKey}`).get(),
-  ]);
-  const me  = meSnap2.val();
-  const opp = oppSnap2.val();
+  // 트랜잭션은 battleCounters 경로만 건드리므로, 위에서 이미 읽은 유저 데이터를
+  // 다시 읽지 않고 그대로 재사용한다(불필요한 read 2회 절감).
+  const me  = meSnap.val();
+  const opp = oppSnap.val();
 
   const myBattle  = battleStarOf(me);
   const oppBattle = battleStarOf(opp);

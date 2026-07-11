@@ -123,9 +123,12 @@ function starImagePath(level, track) {
 // ─── 강화 재료 사용처 안내 ────────────────────────────────────
 
 /**
- * 이 레벨(+트랙)의 별이 상위 강화의 "별" 재료로 쓰이는 단계 이름 목록.
- * 트랙 구간(14~21) 전체를 훑어 star-cost가 이 레벨을 가리키는 단계를 찾는다
- * (하드코딩하면 트랙 수치 조정 시 어긋나기 쉬워 동적으로 스캔).
+ * 이 레벨의 별이 상위 강화의 "별" 재료로 쓰이는 단계(+N강) 목록.
+ * 트랙 구간(14~21, 자기 트랙)과 우주루트(22~29, 트랙 무관 공통)를 모두 훑어
+ * star-cost가 이 레벨을 가리키는 단계를 찾는다(하드코딩하면 수치 조정 시 어긋나기 쉬워 동적으로 스캔).
+ * 5개 트랙 모두 같은 레벨엔 같은 star-cost 커브를 쓰므로, 어느 트랙이든 "+N강 재료"라는
+ * 사실은 동일하다 — 그래서 트랙별로 다른 단계 이름(예: 흑색왜성/백색왜성) 대신 레벨만 표시해
+ * "이 트랙에서만 쓰인다"는 오해를 막는다.
  */
 function starMaterialUsage(level, track) {
   const out = [];
@@ -133,7 +136,13 @@ function starMaterialUsage(level, track) {
   for (let l = 14; l <= 21; l++) {
     const st = resolveStage(l, track);
     if (st && st.cost && st.cost.type === 'star' && st.cost.level === level) {
-      out.push(`+${l}강 ${st.name}`);
+      out.push(`+${l}강`);
+    }
+  }
+  for (let l = 22; l <= 29; l++) {
+    const st = resolveStage(l, null);
+    if (st && st.cost && st.cost.type === 'star' && st.cost.level === level) {
+      out.push(`+${l}강`);
     }
   }
   return out;

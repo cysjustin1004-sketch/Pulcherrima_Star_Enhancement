@@ -129,7 +129,9 @@ function renderAll(user) {
   const starList = document.getElementById('stored-stars-list');
   starList.innerHTML = '';
   const stored = user.storedStars || {};
-  const storedEntries = Object.entries(stored).filter(([, cnt]) => cnt > 0);
+  const storedEntries = Object.entries(stored)
+    .filter(([, cnt]) => cnt > 0)
+    .sort(([keyA], [keyB]) => parseStageKey(keyB).level - parseStageKey(keyA).level);
   const totalStoredCount = storedEntries.reduce((sum, [, cnt]) => sum + cnt, 0);
   document.getElementById('stored-stars-count').textContent = `${totalStoredCount} / ${INVENTORY_CAP}`;
 

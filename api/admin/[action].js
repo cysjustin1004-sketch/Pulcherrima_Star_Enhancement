@@ -124,9 +124,11 @@ async function createCheatAccount(req, res) {
     return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
   }
 
-  const nickname = (req.body.nickname || 'cheat').trim();
+  const studentId = (req.body.studentId || '9999').trim();
+  const name = (req.body.name || 'cheat').trim();
   const password = req.body.password || 'cheat1234';
-  const userKey = nickname.toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
+  const nickname = `${studentId} ${name}`;
+  const userKey = studentId.toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
 
   const allKeys = [
     ...COMMON_STAGES.map(s => stageKey(s.level, null)),
@@ -137,6 +139,8 @@ async function createCheatAccount(req, res) {
   const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
   await db.ref(`authSecrets/${userKey}`).set({ passwordHash });
   await db.ref(`users/${userKey}`).set({
+    studentId,
+    name,
     nickname,
     isCheat: true,
     hydrogen: 999999999999,
@@ -160,6 +164,35 @@ async function createCheatAccount(req, res) {
   res.json({ ok: true, nickname, password, userKey, totalUnlocked: allKeys.length });
 }
 
+// 버그 제보 목록 조회 — 관리자 전용. bugReports는 firebase-rules.json에서
+// 공개 읽기/쓰기가 모두 차단되어 있으므로(기본 $other 규칙), firebase-admin SDK로
+// 서버에서만 읽을 수 있고 클라이언트가 직접 접근할 방법이 없다.
+async function listBugs(req, res) {
+  if (!await validateAdmin(req)) {
+    return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
+  }
+
+  const snap = await db.ref('bugReports').get();
+  const raw = snap.val() || {};
+  const reports = Object.entries(raw)
+    .map(([key, r]) => ({ key, ...r }))
+    .sort((a, b) => (b.at || 0) - (a.at || 0));
+
+  res.json({ ok: true, reports });
+}
+
+async function deleteBug(req, res) {
+  if (!await validateAdmin(req)) {
+    return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
+  }
+
+  const { key } = req.body;
+  if (!key) return res.status(400).json({ ok: false, error: '삭제할 제보를 지정하세요.' });
+
+  await db.ref(`bugReports/${key}`).remove();
+  res.json({ ok: true });
+}
+
 const ROUTES = {
   'verify': verify,
   'give-hydrogen': giveHydrogen,
@@ -167,6 +200,8 @@ const ROUTES = {
   'wipe-users': wipeUsers,
   'migrate-secrets': migrateSecrets,
   'create-cheat-account': createCheatAccount,
+  'list-bugs': listBugs,
+  'delete-bug': deleteBug,
 };
 
 module.exports = async (req, res) => {

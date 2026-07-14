@@ -28,12 +28,22 @@
       <!-- 로그인 폼 -->
       <div id="form-login">
         <div class="form-group">
-          <label class="form-label">닉네임</label>
-          <input type="text" id="login-nickname" placeholder="닉네임 입력" maxlength="12" autocomplete="username">
+          <label class="form-label">학번</label>
+          <input type="text" id="login-studentid" placeholder="학번 입력" maxlength="12" inputmode="numeric" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">이름</label>
+          <input type="text" id="login-name" placeholder="이름 입력" maxlength="10">
         </div>
         <div class="form-group">
           <label class="form-label">비밀번호</label>
           <input type="password" id="login-password" placeholder="비밀번호 입력" autocomplete="current-password">
+        </div>
+        <div class="form-check-row">
+          <label class="form-check-label">
+            <input type="checkbox" id="remember-login">
+            로그인 정보 기억하기
+          </label>
         </div>
         <div class="form-error" id="login-error"></div>
         <button class="btn-primary mt-1" id="btn-login">로그인</button>
@@ -42,8 +52,12 @@
       <!-- 회원가입 폼 -->
       <div id="form-register" style="display:none">
         <div class="form-group">
-          <label class="form-label">닉네임 (2~12자)</label>
-          <input type="text" id="reg-nickname" placeholder="사용할 닉네임 입력" maxlength="12" autocomplete="username">
+          <label class="form-label">학번</label>
+          <input type="text" id="reg-studentid" placeholder="학번 입력" maxlength="12" inputmode="numeric" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">이름</label>
+          <input type="text" id="reg-name" placeholder="이름 입력" maxlength="10">
         </div>
         <div class="form-group">
           <label class="form-label">비밀번호 (4자 이상)</label>
@@ -68,6 +82,17 @@
   <script>
     // 이미 로그인된 경우 메인으로 이동
     if (getSession()) window.location.href = 'index.html';
+
+    // 기억된 로그인 정보(학번·이름만, 비밀번호는 저장하지 않음) 자동 채움
+    (() => {
+      const remembered = getRememberedLogin();
+      if (remembered) {
+        document.getElementById('login-studentid').value = remembered.studentId;
+        document.getElementById('login-name').value = remembered.name;
+        document.getElementById('remember-login').checked = true;
+        document.getElementById('login-password').focus();
+      }
+    })();
 
     const tabLogin    = document.getElementById('tab-login');
     const tabRegister = document.getElementById('tab-register');
@@ -96,12 +121,21 @@
       btn.disabled = true;
       btn.textContent = '로그인 중...';
 
+      const studentId = document.getElementById('login-studentid').value;
+      const name      = document.getElementById('login-name').value;
+
       const result = await login(
-        document.getElementById('login-nickname').value,
+        studentId,
+        name,
         document.getElementById('login-password').value
       );
 
       if (result.ok) {
+        if (document.getElementById('remember-login').checked) {
+          saveRememberedLogin({ studentId: studentId.trim(), name: name.trim() });
+        } else {
+          clearRememberedLogin();
+        }
         window.location.href = 'index.html';
       } else {
         errEl.textContent = result.error;
@@ -134,7 +168,8 @@
       btn.textContent = '가입 중...';
 
       const result = await register(
-        document.getElementById('reg-nickname').value,
+        document.getElementById('reg-studentid').value,
+        document.getElementById('reg-name').value,
         pw
       );
 

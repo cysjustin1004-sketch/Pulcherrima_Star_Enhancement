@@ -3,20 +3,23 @@ const { createSession } = require('../../lib/session');
 const { STARTING_HYDROGEN, nicknameToKey } = require('../../lib/game-config');
 
 async function login(req, res) {
-  const { nickname, passwordHash } = req.body;
-  if (!nickname || !passwordHash) {
-    return res.status(400).json({ ok: false, error: '닉네임과 비밀번호를 입력하세요.' });
+  const { studentId, name, passwordHash } = req.body;
+  if (!studentId || !name || !passwordHash) {
+    return res.status(400).json({ ok: false, error: '학번, 이름, 비밀번호를 입력하세요.' });
   }
 
-  const userKey = nicknameToKey(nickname);
+  const userKey = nicknameToKey(studentId);
   const snap = await db.ref(`users/${userKey}`).get();
   if (!snap.exists()) {
-    return res.status(401).json({ ok: false, error: '존재하지 않는 닉네임입니다.' });
+    return res.status(401).json({ ok: false, error: '존재하지 않는 학번입니다.' });
   }
 
   const user = snap.val();
   if (user.banned) {
     return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
+  }
+  if ((user.name || '').trim() !== name.trim()) {
+    return res.status(401).json({ ok: false, error: '학번 또는 이름이 일치하지 않습니다.' });
   }
 
   const secretSnap = await db.ref(`authSecrets/${userKey}`).get();
@@ -41,25 +44,32 @@ async function login(req, res) {
 }
 
 async function register(req, res) {
-  const { nickname, passwordHash } = req.body;
-  const nick = (nickname || '').trim();
+  const { studentId, name, passwordHash } = req.body;
+  const sid = (studentId || '').trim();
+  const nm  = (name || '').trim();
 
-  if (!nick || nick.length < 2 || nick.length > 12) {
-    return res.status(400).json({ ok: false, error: '닉네임은 2~12자여야 합니다.' });
+  if (!sid || sid.length > 12) {
+    return res.status(400).json({ ok: false, error: '학번을 입력하세요.' });
+  }
+  if (!nm || nm.length > 10) {
+    return res.status(400).json({ ok: false, error: '이름을 입력하세요.' });
   }
   if (!passwordHash || passwordHash.length !== 64) {
     return res.status(400).json({ ok: false, error: '비밀번호가 유효하지 않습니다.' });
   }
 
-  const userKey = nicknameToKey(nick);
+  const userKey = nicknameToKey(sid);
   const existing = await db.ref(`users/${userKey}`).get();
   if (existing.exists()) {
-    return res.status(409).json({ ok: false, error: '이미 사용 중인 닉네임입니다.' });
+    return res.status(409).json({ ok: false, error: '이미 등록된 학번입니다.' });
   }
 
+  const nick = `${sid} ${nm}`;
   const now = Date.now();
   await db.ref(`authSecrets/${userKey}`).set({ passwordHash });
   await db.ref(`users/${userKey}`).set({
+    studentId: sid,
+    name: nm,
     nickname: nick,
     hydrogen: STARTING_HYDROGEN,
     currentStar: 0,

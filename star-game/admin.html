@@ -35,8 +35,8 @@
     <div class="card">
       <div class="card-title">수소 지급</div>
       <div class="form-group">
-        <label class="form-label">유저 닉네임</label>
-        <input type="text" id="give-nickname" placeholder="닉네임 입력" maxlength="12">
+        <label class="form-label">유저 학번</label>
+        <input type="text" id="give-nickname" placeholder="학번 입력" maxlength="12">
       </div>
       <div class="form-group">
         <label class="form-label">지급할 수소 양</label>
@@ -50,11 +50,15 @@
     <div class="card">
       <div class="card-title">치트 계정 생성 (도감 전부 해금)</div>
       <div style="font-size:0.82rem; color:var(--text-sub); margin-bottom:0.75rem;">
-        닉네임/비밀번호로 도감이 전부 해금된 테스트용 계정을 만듭니다. 이미 있는 닉네임이면 해당 계정을 덮어써서 갱신합니다.
+        학번/이름/비밀번호로 도감이 전부 해금된 테스트용 계정을 만듭니다. 이미 있는 학번이면 해당 계정을 덮어써서 갱신합니다.
       </div>
       <div class="form-group">
-        <label class="form-label">닉네임</label>
-        <input type="text" id="cheat-nickname" placeholder="cheat" maxlength="12">
+        <label class="form-label">학번</label>
+        <input type="text" id="cheat-studentid" placeholder="9999" maxlength="12">
+      </div>
+      <div class="form-group">
+        <label class="form-label">이름</label>
+        <input type="text" id="cheat-name" placeholder="cheat" maxlength="10">
       </div>
       <div class="form-group">
         <label class="form-label">비밀번호</label>
@@ -67,6 +71,14 @@
     <div class="card">
       <div class="card-title">전체 유저 목록</div>
       <div id="user-list">
+        <div style="color:var(--text-sub); font-size:0.9rem;">로딩 중...</div>
+      </div>
+    </div>
+
+    <!-- 버그 제보 목록 -->
+    <div class="card">
+      <div class="card-title">버그 제보 목록</div>
+      <div id="bug-list">
         <div style="color:var(--text-sub); font-size:0.9rem;">로딩 중...</div>
       </div>
     </div>
@@ -155,6 +167,65 @@ function enterAdminPanel() {
   document.getElementById('auth-screen').style.display   = 'none';
   document.getElementById('admin-screen').style.display  = '';
   loadUsers();
+  loadBugs();
+}
+
+// ─── 버그 제보 목록 ───────────────────────────────────
+
+async function loadBugs() {
+  const bugList = document.getElementById('bug-list');
+  bugList.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem;">로딩 중...</div>';
+
+  const res = await fetch('/api/admin/list-bugs', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'X-Admin-Token': adminToken || '',
+    },
+    body: JSON.stringify({}),
+  });
+  const data = await res.json();
+
+  if (!data.ok || !data.reports || data.reports.length === 0) {
+    bugList.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem;">제보 없음</div>';
+    return;
+  }
+
+  bugList.innerHTML = '';
+  data.reports.forEach(r => {
+    const dt = new Date(r.at).toLocaleString('ko-KR');
+    const row = document.createElement('div');
+    row.className = 'admin-user-row';
+    row.innerHTML = `
+      <div class="admin-user-info">
+        <div class="admin-user-nick">${escapeHtml(r.nickname || r.fromKey)}</div>
+        <div class="admin-user-stat" style="white-space:pre-wrap;">${escapeHtml(r.text)}</div>
+        <div class="admin-user-stat">${dt}</div>
+      </div>
+      <button class="btn-danger" style="font-size:0.78rem; padding:0.4rem 0.7rem; flex-shrink:0;">삭제</button>
+    `;
+    row.querySelector('button').addEventListener('click', () => deleteBugReport(r.key));
+    bugList.appendChild(row);
+  });
+}
+
+async function deleteBugReport(key) {
+  const res = await fetch('/api/admin/delete-bug', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'X-Admin-Token': adminToken || '',
+    },
+    body: JSON.stringify({ key }),
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    showToast('제보를 삭제했습니다.');
+    await loadBugs();
+  } else {
+    showToast(data.error || '삭제 실패');
+  }
 }
 
 // ─── 유저 목록 로드 ─────────────────────────────────
@@ -244,7 +315,7 @@ document.getElementById('btn-give-hydrogen').addEventListener('click', async () 
   errEl.classList.remove('visible');
 
   if (!nick) {
-    errEl.textContent = '닉네임을 입력하세요.';
+    errEl.textContent = '학번을 입력하세요.';
     errEl.classList.add('visible');
     return;
   }
@@ -301,8 +372,9 @@ async function toggleBan(userKey, nickname, currentlyBanned) {
 // ─── 치트 계정 생성 (QA/도감 확인용) ─────────────────
 
 document.getElementById('btn-create-cheat').addEventListener('click', async () => {
-  const nickname = document.getElementById('cheat-nickname').value.trim() || 'cheat';
-  const password = document.getElementById('cheat-password').value.trim() || 'cheat1234';
+  const studentId = document.getElementById('cheat-studentid').value.trim() || '9999';
+  const name      = document.getElementById('cheat-name').value.trim() || 'cheat';
+  const password  = document.getElementById('cheat-password').value.trim() || 'cheat1234';
 
   const res = await fetch('/api/admin/create-cheat-account', {
     method:  'POST',
@@ -310,12 +382,12 @@ document.getElementById('btn-create-cheat').addEventListener('click', async () =
       'Content-Type':  'application/json',
       'X-Admin-Token': adminToken || '',
     },
-    body: JSON.stringify({ nickname, password }),
+    body: JSON.stringify({ studentId, name, password }),
   });
   const data = await res.json();
 
   if (data.ok) {
-    showToast(`치트 계정 생성 완료! 닉네임: ${data.nickname} / 비밀번호: ${password} (도감 ${data.totalUnlocked}개 해금)`);
+    showToast(`치트 계정 생성 완료! 학번 이름: ${data.nickname} / 비밀번호: ${password} (도감 ${data.totalUnlocked}개 해금)`);
     await loadUsers();
   } else {
     showToast(data.error || '생성 실패');

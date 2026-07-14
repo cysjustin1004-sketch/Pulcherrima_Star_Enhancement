@@ -770,6 +770,22 @@ async function showBattleNotifications() {
 
 (async () => {
   await reload();
+
+  // 방지권 선택 모달을 띄운 채로 탭을 닫았다가(Ctrl+Shift+T 등으로) 복원한 경우,
+  // 서버엔 아직 해결 안 된 pendingFailure가 남아있다. 그대로 두면 강화 버튼이
+  // 활성 상태로 뜨고 서버도 이걸 거부하니(409) 유저가 갇히므로, 로드 시점에
+  // 실패 흐름을 그대로 재진입시켜 반드시 결정(방지권 사용/포기)을 내리게 한다.
+  if (currentUser && currentUser.pendingFailure) {
+    pendingState = {
+      failed:       true,
+      drop:         null,  // 드랍은 실패 시점에 이미 지급됨 — 재알림하지 않음
+      dropPickedUp: true,
+      failedLevel:  currentUser.pendingFailure.level,
+    };
+    document.getElementById('btn-enhance').disabled = true;
+    advanceFailureFlow();
+  }
+
   showBattleNotifications(); // 강화 흐름을 막지 않도록 결과를 기다리지 않음
 })();
 </script>

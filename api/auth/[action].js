@@ -1,6 +1,23 @@
+const crypto = require('crypto');
 const db = require('../../lib/firebase-admin');
 const { createSession } = require('../../lib/session');
 const { STARTING_HYDROGEN, nicknameToKey } = require('../../lib/game-config');
+const { sendVerificationCode } = require('../../lib/mailer');
+const { isRateLimited } = require('../../lib/rate-limit');
+
+// goedu.kr로 끝나는 이메일만 허용(하위 도메인 포함). 도트 경계로 앵커되어 있어
+// "fakegoedu.kr" 같은 스푸핑은 걸러진다.
+const EMAIL_PATTERN = /^[^@\s]+@(([a-z0-9-]+\.)*goedu\.kr)$/i;
+const CODE_TTL      = 10 * 60 * 1000; // 코드 유효 10분
+const RESEND_CD     = 60 * 1000;      // 재발송 쿨다운 60초
+const MAX_ATTEMPTS  = 5;              // 코드 오답 허용 횟수
+const MAX_SENDS     = 5;              // 이메일당 시간당 발송 상한
+const SEND_WINDOW   = 60 * 60 * 1000; // 발송 상한 집계 윈도우 1시간
+const VERIFY_WINDOW = 30 * 60 * 1000; // 인증 완료 후 register가 유효하다고 인정하는 시간
+
+function emailKey(email) {
+  return Buffer.from(email.trim().toLowerCase()).toString('base64url');
+}
 
 async function login(req, res) {
   const { nickname, passwordHash } = req.body;
@@ -46,11 +63,101 @@ async function login(req, res) {
 // 학번 4자리: [학년(1~3)][반(1~5)][번호(01~21)]. 선생님/외부인은 예외적으로 "0000"을 쓴다.
 const STUDENT_ID_PATTERN = /^[1-3][1-5](0[1-9]|1[0-9]|2[01])$/;
 
+async function sendEmailCode(req, res) {
+  const email = (req.body.email || '').trim().toLowerCase();
+  if (!EMAIL_PATTERN.test(email)) {
+    return res.status(400).json({ ok: false, error: 'goedu.kr 형식의 이메일을 입력해주세요.' });
+  }
+
+  const eKey = emailKey(email);
+
+  // 메모리 레이트리밋(웜 인스턴스 한정) — DB 카운터를 확인하기 전 값싼 1차 방어선
+  if (isRateLimited(`emailsend:${eKey}`, 3)) {
+    return res.status(429).json({ ok: false, error: '잠시 후 다시 시도해주세요.' });
+  }
+
+  const now = Date.now();
+  const snap = await db.ref(`emailVerifications/${eKey}`).get();
+  const prev = snap.exists() ? snap.val() : null;
+
+  if (prev && now - (prev.lastSentAt || 0) < RESEND_CD) {
+    return res.status(429).json({ ok: false, error: '잠시 후 다시 시도해주세요.' });
+  }
+
+  let sendCount = 1;
+  let windowStart = now;
+  if (prev && prev.windowStart && now - prev.windowStart < SEND_WINDOW) {
+    windowStart = prev.windowStart;
+    sendCount = (prev.sendCount || 0) + 1;
+    if (sendCount > MAX_SENDS) {
+      return res.status(429).json({ ok: false, error: '발송 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.' });
+    }
+  }
+
+  const code = crypto.randomInt(0, 1000000).toString().padStart(6, '0');
+  const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+
+  await db.ref(`emailVerifications/${eKey}`).set({
+    email, codeHash,
+    expiresAt: now + CODE_TTL,
+    attempts: 0,
+    lastSentAt: now,
+    sendCount, windowStart,
+    verified: false,
+    verifiedAt: null,
+  });
+
+  try {
+    await sendVerificationCode(email, code);
+  } catch (e) {
+    await db.ref(`emailVerifications/${eKey}`).remove();
+    return res.status(502).json({ ok: false, error: '메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.' });
+  }
+
+  res.json({ ok: true });
+}
+
+async function verifyEmailCode(req, res) {
+  const email = (req.body.email || '').trim().toLowerCase();
+  const code  = (req.body.code || '').trim();
+  if (!EMAIL_PATTERN.test(email) || !code) {
+    return res.status(400).json({ ok: false, error: '이메일과 인증 코드를 입력하세요.' });
+  }
+
+  const eKey = emailKey(email);
+  const snap = await db.ref(`emailVerifications/${eKey}`).get();
+  if (!snap.exists()) {
+    return res.status(410).json({ ok: false, error: '인증 코드가 만료되었습니다. 다시 요청해주세요.' });
+  }
+
+  const rec = snap.val();
+  if (Date.now() > rec.expiresAt) {
+    return res.status(410).json({ ok: false, error: '인증 코드가 만료되었습니다. 다시 요청해주세요.' });
+  }
+  if ((rec.attempts || 0) >= MAX_ATTEMPTS) {
+    return res.status(429).json({ ok: false, error: '시도 횟수를 초과했습니다. 코드를 다시 요청해주세요.' });
+  }
+
+  const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+  const a = Buffer.from(codeHash, 'hex');
+  const b = Buffer.from(rec.codeHash, 'hex');
+  const match = a.length === b.length && crypto.timingSafeEqual(a, b);
+
+  if (!match) {
+    await db.ref(`emailVerifications/${eKey}/attempts`).set((rec.attempts || 0) + 1);
+    return res.status(401).json({ ok: false, error: '코드가 다릅니다.' });
+  }
+
+  await db.ref(`emailVerifications/${eKey}`).update({ verified: true, verifiedAt: Date.now() });
+  res.json({ ok: true });
+}
+
 async function register(req, res) {
-  const { nickname, passwordHash, studentId, realName } = req.body;
+  const { nickname, passwordHash, studentId, realName, email } = req.body;
   const nick = (nickname || '').trim();
   const sid  = (studentId || '').trim();
   const name = (realName || '').trim();
+  const mail = (email || '').trim().toLowerCase();
 
   if (!nick || nick.length < 2 || nick.length > 12) {
     return res.status(400).json({ ok: false, error: '닉네임은 2~12자여야 합니다.' });
@@ -64,6 +171,17 @@ async function register(req, res) {
   if (!name || name.length > 20) {
     return res.status(400).json({ ok: false, error: '이름을 입력하세요(20자 이하).' });
   }
+  if (!EMAIL_PATTERN.test(mail)) {
+    return res.status(400).json({ ok: false, error: 'goedu.kr 형식의 이메일을 입력해주세요.' });
+  }
+
+  // 서버가 직접 인증 기록을 재확인 — 클라이언트가 "인증 완료" 플래그만 보내는 것을 신뢰하지 않는다.
+  const eKey = emailKey(mail);
+  const evSnap = await db.ref(`emailVerifications/${eKey}`).get();
+  const ev = evSnap.exists() ? evSnap.val() : null;
+  if (!ev || !ev.verified || ev.email !== mail || Date.now() - ev.verifiedAt > VERIFY_WINDOW) {
+    return res.status(403).json({ ok: false, error: '이메일 본인인증을 완료해주세요.' });
+  }
 
   const userKey = nicknameToKey(nick);
   const existing = await db.ref(`users/${userKey}`).get();
@@ -71,7 +189,10 @@ async function register(req, res) {
     return res.status(409).json({ ok: false, error: '이미 사용 중인 닉네임입니다.' });
   }
 
-  const upd = {};
+  const upd = {
+    [`userEmails/${userKey}`]: { email: mail, verifiedAt: ev.verifiedAt },
+    [`emailVerifications/${eKey}`]: null, // 인증 기록 소비(재사용 방지)
+  };
 
   // 0000(선생님/외부인)은 여러 명이 공유할 수 있어 중복 검사에서 제외 — 그 외 학번은
   // studentIds/{학번} 인덱스로 단 한 명만 등록되도록 보장(users 전체를 훑지 않고 조회 1번으로 확인).
@@ -112,7 +233,12 @@ async function register(req, res) {
   res.json({ ok: true, token, userKey, nickname: nick });
 }
 
-const ROUTES = { login, register };
+const ROUTES = {
+  login,
+  register,
+  'send-email-code': sendEmailCode,
+  'verify-email-code': verifyEmailCode,
+};
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();

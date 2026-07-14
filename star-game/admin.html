@@ -230,7 +230,18 @@ async function loadUsers() {
   const userList = document.getElementById('user-list');
   userList.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem;">로딩 중...</div>';
 
-  const snap = await dbGet('users');
+  // 유저 목록(닉네임/수소 등)은 공개 읽기, 이메일은 관리자 토큰 인증 API로 별도 취득 —
+  // userEmails는 firebase-rules.json에서 공개 읽기가 차단되어 있어 이렇게만 볼 수 있다.
+  const [snap, emailRes] = await Promise.all([
+    dbGet('users'),
+    fetch('/api/admin/get-user-emails', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Token': adminToken || '' },
+      body:    JSON.stringify({}),
+    }).then(r => r.json()).catch(() => ({ ok: false })),
+  ]);
+  const emails = (emailRes && emailRes.ok) ? emailRes.emails : {};
+
   if (!snap) {
     userList.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem;">유저가 없습니다.</div>';
     return;
@@ -248,6 +259,7 @@ async function loadUsers() {
     row.innerHTML = `
       <div class="admin-user-info">
         <div class="admin-user-nick">${escapeHtml(user.nickname || user.key)}${isBanned ? ' <span style="color:var(--danger);font-size:0.75rem;">[벤]</span>' : ''}${user.isCheat ? ' <span style="color:var(--blue);font-size:0.75rem;">[치트]</span>' : ''}</div>
+        <div class="admin-user-stat">📧 ${escapeHtml(emails[user.key] || '(미등록)')}</div>
         <div class="admin-user-stat">
           💧 ${formatNumber(user.hydrogen || 0)} · ⭐ +${user.currentStar || 0} · 최고 +${user.bestStar || 0} · 방지권 ${user.protectionScrolls || 0}
         </div>

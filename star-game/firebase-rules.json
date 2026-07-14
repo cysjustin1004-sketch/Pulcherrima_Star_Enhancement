@@ -59,6 +59,16 @@
       ".write": false
     },
 
+    "emailVerifications": {
+      ".read": false,
+      ".write": false
+    },
+
+    "userEmails": {
+      ".read": false,
+      ".write": false
+    },
+
     "config": {
       ".read": false,
       ".write": false

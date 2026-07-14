@@ -93,14 +93,54 @@ function clearRememberedLogin() {
 // 학번 4자리: [학년(1~3)][반(1~5)][번호(01~21)]. 선생님/외부인은 예외적으로 "0000"을 쓴다.
 const STUDENT_ID_PATTERN = /^[1-3][1-5](0[1-9]|1[0-9]|2[01])$/;
 
+// goedu.kr로 끝나는 이메일만 허용(하위 도메인 포함) — 서버와 동일한 패턴
+const EMAIL_PATTERN = /^[^@\s]+@(([a-z0-9-]+\.)*goedu\.kr)$/i;
+
+/** 이메일 인증 코드 발송 요청 — /api/auth/send-email-code 호출 */
+async function sendEmailCode(email) {
+  const mail = (email || '').trim();
+  if (!EMAIL_PATTERN.test(mail)) {
+    return { ok: false, error: 'goedu.kr 형식의 이메일을 입력해주세요.' };
+  }
+  try {
+    const res = await fetch('/api/auth/send-email-code', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email: mail }),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || '인증 코드 발송 실패' };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: '서버 연결 오류' };
+  }
+}
+
+/** 이메일 인증 코드 확인 — /api/auth/verify-email-code 호출 */
+async function verifyEmailCode(email, code) {
+  try {
+    const res = await fetch('/api/auth/verify-email-code', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email: (email || '').trim(), code: (code || '').trim() }),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || '인증 실패' };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: '서버 연결 오류' };
+  }
+}
+
 /**
  * 회원가입 — /api/auth/register 호출
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
-async function register(nickname, studentId, realName, password) {
+async function register(nickname, studentId, realName, password, email) {
   const nick = nickname.trim();
   const sid  = studentId.trim();
   const name = realName.trim();
+  const mail = (email || '').trim();
 
   if (!nick || nick.length < 2 || nick.length > 12) {
     return { ok: false, error: '닉네임은 2~12자여야 합니다.' };
@@ -110,6 +150,9 @@ async function register(nickname, studentId, realName, password) {
   }
   if (!name || name.length > 20) {
     return { ok: false, error: '이름을 입력하세요(20자 이하).' };
+  }
+  if (!EMAIL_PATTERN.test(mail)) {
+    return { ok: false, error: 'goedu.kr 형식의 이메일을 입력해주세요.' };
   }
   if (!password || password.length < 4) {
     return { ok: false, error: '비밀번호는 4자 이상이어야 합니다.' };
@@ -121,7 +164,7 @@ async function register(nickname, studentId, realName, password) {
     const res  = await fetch('/api/auth/register', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ nickname: nick, studentId: sid, realName: name, passwordHash }),
+      body:    JSON.stringify({ nickname: nick, studentId: sid, realName: name, email: mail, passwordHash }),
     });
     const data = await res.json();
     if (!data.ok) return { ok: false, error: data.error || '회원가입 실패' };

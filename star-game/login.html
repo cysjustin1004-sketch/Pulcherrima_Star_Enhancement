@@ -60,6 +60,20 @@
           <input type="text" id="reg-real-name" placeholder="실명 입력" maxlength="20" autocomplete="off">
         </div>
         <div class="form-group">
+          <label class="form-label">이메일 본인인증</label>
+          <div style="display:flex; gap:0.5rem;">
+            <input type="email" id="reg-email" placeholder="goedu.kr 형식으로 입력해주세요." style="flex:1;" autocomplete="off">
+            <button class="btn-secondary" id="btn-send-code" style="width:auto; flex-shrink:0;">인증 코드 보내기</button>
+          </div>
+        </div>
+        <div class="form-group" id="email-code-group" style="display:none;">
+          <div style="display:flex; gap:0.5rem;">
+            <input type="text" id="reg-email-code" placeholder="6자리 코드 입력" maxlength="6" inputmode="numeric" style="flex:1;">
+            <button class="btn-secondary" id="btn-verify-code" style="width:auto; flex-shrink:0;">확인</button>
+          </div>
+        </div>
+        <div id="email-status" style="font-size:0.82rem; margin:-0.4rem 0 0.9rem; color:var(--text-sub);"></div>
+        <div class="form-group">
           <label class="form-label">비밀번호 (4자 이상)</label>
           <input type="password" id="reg-password" placeholder="비밀번호 입력" autocomplete="new-password">
         </div>
@@ -147,11 +161,97 @@
       if (e.key === 'Enter') document.getElementById('btn-login').click();
     });
 
+    // ─── 이메일 본인인증 ───────────────────────────────
+
+    let emailVerified = false;
+    let resendTimer = null;
+
+    const emailInput   = document.getElementById('reg-email');
+    const codeGroup     = document.getElementById('email-code-group');
+    const codeInput     = document.getElementById('reg-email-code');
+    const btnSendCode   = document.getElementById('btn-send-code');
+    const btnVerifyCode = document.getElementById('btn-verify-code');
+    const emailStatus   = document.getElementById('email-status');
+    const btnRegister   = document.getElementById('btn-register');
+
+    function resetEmailVerification() {
+      emailVerified = false;
+      btnRegister.disabled = true;
+      codeGroup.style.display = 'none';
+      codeInput.value = '';
+      emailStatus.textContent = '';
+      emailStatus.style.color = 'var(--text-sub)';
+    }
+    resetEmailVerification();
+
+    emailInput.addEventListener('input', () => {
+      if (emailVerified) resetEmailVerification();
+    });
+
+    function startResendCountdown() {
+      let remaining = 60;
+      btnSendCode.disabled = true;
+      btnSendCode.textContent = `인증 코드 보내기 (${remaining})`;
+      resendTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+          clearInterval(resendTimer);
+          btnSendCode.disabled = false;
+          btnSendCode.textContent = '인증 코드 보내기';
+        } else {
+          btnSendCode.textContent = `인증 코드 보내기 (${remaining})`;
+        }
+      }, 1000);
+    }
+
+    btnSendCode.addEventListener('click', async () => {
+      emailStatus.style.color = 'var(--text-sub)';
+      emailStatus.textContent = '발송 중...';
+      btnSendCode.disabled = true;
+
+      const result = await sendEmailCode(emailInput.value);
+
+      if (result.ok) {
+        codeGroup.style.display = '';
+        emailStatus.textContent = '코드를 이메일로 보냈습니다.';
+        startResendCountdown();
+      } else {
+        emailStatus.style.color = 'var(--danger)';
+        emailStatus.textContent = result.error;
+        btnSendCode.disabled = false;
+      }
+    });
+
+    btnVerifyCode.addEventListener('click', async () => {
+      const result = await verifyEmailCode(emailInput.value, codeInput.value);
+
+      if (result.ok) {
+        emailVerified = true;
+        emailInput.disabled = true;
+        codeInput.disabled = true;
+        btnSendCode.disabled = true;
+        btnVerifyCode.disabled = true;
+        if (resendTimer) clearInterval(resendTimer);
+        emailStatus.style.color = 'var(--success)';
+        emailStatus.textContent = '✓ 본인인증 완료';
+        btnRegister.disabled = false;
+      } else {
+        emailStatus.style.color = 'var(--danger)';
+        emailStatus.textContent = result.error;
+      }
+    });
+
     // 회원가입
-    document.getElementById('btn-register').addEventListener('click', async () => {
-      const btn = document.getElementById('btn-register');
+    btnRegister.addEventListener('click', async () => {
+      const btn = btnRegister;
       const errEl = document.getElementById('reg-error');
       errEl.classList.remove('visible');
+
+      if (!emailVerified) {
+        errEl.textContent = '이메일 본인인증을 완료해주세요.';
+        errEl.classList.add('visible');
+        return;
+      }
 
       const pw  = document.getElementById('reg-password').value;
       const pw2 = document.getElementById('reg-password2').value;
@@ -168,7 +268,8 @@
         document.getElementById('reg-nickname').value,
         document.getElementById('reg-student-id').value,
         document.getElementById('reg-real-name').value,
-        pw
+        pw,
+        emailInput.value
       );
 
       if (result.ok) {

@@ -111,6 +111,7 @@ async function deleteUser(req, res) {
   const upd = {
     [`users/${userKey}`]: null,
     [`authSecrets/${userKey}`]: null,
+    [`userEmails/${userKey}`]: null,
     [`enhanceLogs/${userKey}`]: null,
     [`battleLogs/${userKey}`]: null,
     [`battleCounters/${userKey}`]: null,
@@ -165,6 +166,8 @@ async function wipeUsers(req, res) {
     users: null,
     enhanceLogs: null,
     authSecrets: null,
+    userEmails: null,
+    emailVerifications: null,
     studentIds: null,
     friends: null,
     friendRequests: null,
@@ -272,6 +275,22 @@ async function deleteBug(req, res) {
   res.json({ ok: true });
 }
 
+// 유저별 인증 이메일 조회 — 관리자 전용. userEmails는 firebase-rules.json에서
+// 공개 읽기/쓰기가 차단되어 있으므로, 이 admin-token 인증 API를 거쳐야만 볼 수 있다.
+// 기존 loadUsers()의 공개 dbGet('users') 경로에는 이메일이 절대 실리지 않는다.
+async function getUserEmails(req, res) {
+  if (!await validateAdmin(req)) {
+    return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
+  }
+
+  const snap = await db.ref('userEmails').get();
+  const raw = snap.val() || {};
+  const emails = {};
+  for (const [userKey, v] of Object.entries(raw)) emails[userKey] = v.email;
+
+  res.json({ ok: true, emails });
+}
+
 const ROUTES = {
   'verify': verify,
   'give-hydrogen': giveHydrogen,
@@ -282,6 +301,7 @@ const ROUTES = {
   'create-cheat-account': createCheatAccount,
   'list-bugs': listBugs,
   'delete-bug': deleteBug,
+  'get-user-emails': getUserEmails,
 };
 
 module.exports = async (req, res) => {

@@ -349,6 +349,125 @@ input::placeholder { color: #9a9a9a; }
   50%       { transform: scale(1.03); }
 }
 
+/* ── 강화 성공 이펙트 ────────────────────────────────── */
+/* 별 상자가 뿅 튀는 팝 */
+.star-visual.enhance-success { animation: enhance-pop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes enhance-pop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(1.16); }
+  60%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+/* 성공 순간 초록 플래시 (상자 내부를 덮음) */
+.enhance-flash {
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: radial-gradient(circle, var(--success-glow) 0%, rgba(22,163,74,0.5) 40%, transparent 75%);
+  animation: enhance-flash 0.5s ease-out forwards;
+}
+@keyframes enhance-flash { 0% { opacity: 0.9; } 100% { opacity: 0; } }
+
+/* 사방으로 퍼지는 초록 링 */
+.enhance-ring {
+  position: absolute; left: 50%; top: 50%; z-index: 2; pointer-events: none;
+  width: 150px; height: 150px; margin: -75px 0 0 -75px;
+  border: 4px solid var(--success);
+  animation: enhance-ring 0.7s ease-out forwards;
+}
+@keyframes enhance-ring {
+  0%   { transform: scale(0.5); opacity: 0.85; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+/* 별 중심에서 튀어나가는 파티클 (--ang 방향으로 발사) */
+.enhance-particle {
+  position: absolute; left: 50%; top: 50%; z-index: 4; pointer-events: none;
+  width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  background: var(--success);
+  transform: rotate(var(--ang)) translateY(0);
+  animation: enhance-particle 0.7s ease-out forwards;
+}
+@keyframes enhance-particle {
+  0%   { transform: rotate(var(--ang)) translateY(0) scale(1);   opacity: 1; }
+  100% { transform: rotate(var(--ang)) translateY(-130px) scale(0.2); opacity: 0; }
+}
+
+/* 위로 떠오르는 "+N강!" 텍스트 */
+.enhance-levelup {
+  position: absolute; left: 50%; top: 8%; z-index: 5; pointer-events: none;
+  transform: translateX(-50%);
+  font-family: 'Sora', 'Hanken Grotesk', sans-serif;
+  font-size: 1.6rem; font-weight: 900; color: var(--success);
+  text-shadow: 2px 2px 0 var(--border);
+  white-space: nowrap;
+  animation: enhance-levelup 0.9s ease-out forwards;
+}
+@keyframes enhance-levelup {
+  0%   { transform: translateX(-50%) translateY(10px) scale(0.6); opacity: 0; }
+  25%  { transform: translateX(-50%) translateY(0) scale(1.1);    opacity: 1; }
+  70%  { transform: translateX(-50%) translateY(-24px) scale(1);  opacity: 1; }
+  100% { transform: translateX(-50%) translateY(-54px) scale(1);  opacity: 0; }
+}
+
+/* ── 페이즈 진입 시네마틱 오버레이 ──────────────────────── */
+.phase-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 300;
+  align-items: center; justify-content: center;
+  padding: 2rem; text-align: center; cursor: pointer;
+  background: radial-gradient(ellipse at center, rgba(18,18,24,0.96) 0%, rgba(0,0,0,0.99) 100%);
+  opacity: 0; transition: opacity 0.5s ease;
+}
+.phase-overlay.visible { display: flex; opacity: 1; }
+
+.phase-inner { max-width: 540px; }
+
+.phase-kicker {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 0.85rem; font-weight: 700; letter-spacing: 0.4em;
+  text-transform: uppercase; color: var(--phase-glow, #9ca3af);
+  margin-bottom: 1.2rem; opacity: 0;
+}
+.phase-title {
+  font-family: 'Sora', 'Hanken Grotesk', sans-serif;
+  font-size: 2.4rem; font-weight: 900; line-height: 1.25;
+  color: #fff; margin-bottom: 1.3rem;
+  text-shadow: 0 0 34px var(--phase-glow, rgba(255,255,255,0.4));
+  opacity: 0;
+}
+.phase-desc {
+  font-family: 'Noto Sans KR', sans-serif;
+  font-size: 0.98rem; line-height: 1.75; color: #d1d5db;
+  margin-bottom: 2.2rem; opacity: 0;
+}
+.phase-hint {
+  font-size: 0.78rem; color: #6b7280; letter-spacing: 0.05em; opacity: 0;
+}
+
+.phase-overlay.visible .phase-kicker { animation: phase-in 0.6s ease-out 0.15s forwards; }
+.phase-overlay.visible .phase-title  { animation: phase-in 0.7s ease-out 0.45s forwards; }
+.phase-overlay.visible .phase-desc   { animation: phase-in 0.7s ease-out 0.95s forwards; }
+.phase-overlay.visible .phase-hint   { animation: phase-hint-in 0.8s ease-out 1.7s forwards; }
+
+@keyframes phase-in {
+  0%   { opacity: 0; transform: translateY(16px); filter: blur(5px); }
+  100% { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+@keyframes phase-hint-in { 0% { opacity: 0; } 100% { opacity: 0.7; } }
+
+/* 톤별 글로우 색 */
+.phase-overlay.tone-red    { --phase-glow: #f87171; }
+.phase-overlay.tone-gold   { --phase-glow: #fbbf24; }
+.phase-overlay.tone-blue   { --phase-glow: #60a5fa; }
+.phase-overlay.tone-violet { --phase-glow: #a78bfa; }
+.phase-overlay.tone-cyan   { --phase-glow: #22d3ee; }
+.phase-overlay.tone-dark   { --phase-glow: #9ca3af; }
+.phase-overlay.tone-rainbow .phase-title {
+  background: linear-gradient(90deg,#f87171,#fbbf24,#4ade80,#60a5fa,#a78bfa);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  text-shadow: none;
+}
+
 /* 성공/실패 오버레이 */
 .result-overlay {
   display: none;
@@ -1293,4 +1412,8 @@ input::placeholder { color: #9a9a9a; }
   .btn-enhance  { font-size: 1rem; }
   .status-value { font-size: 0.85rem; }
   .item-slot-grid { gap: 0.45rem; }
+  /* 페이즈 시네마틱 — 좁은 화면에서 제목/키커가 넘치지 않도록 축소 */
+  .phase-title  { font-size: 1.85rem; }
+  .phase-kicker { letter-spacing: 0.28em; font-size: 0.8rem; }
+  .phase-desc   { font-size: 0.92rem; }
 }

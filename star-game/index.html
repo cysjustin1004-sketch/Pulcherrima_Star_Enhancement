@@ -60,6 +60,16 @@
   </div>
 </div>
 
+<!-- ───────────────── 페이즈 진입 시네마틱 오버레이 ───────────────── -->
+<div class="phase-overlay" id="phase-overlay">
+  <div class="phase-inner">
+    <div class="phase-kicker" id="phase-kicker"></div>
+    <div class="phase-title"  id="phase-title"></div>
+    <div class="phase-desc"   id="phase-desc"></div>
+    <div class="phase-hint">탭하거나 스페이스바를 눌러 계속</div>
+  </div>
+</div>
+
 <!-- ───────────────── 강화 결과 오버레이 ───────────────── -->
 <div class="result-overlay" id="result-overlay">
   <div class="result-title" id="result-title"></div>
@@ -433,9 +443,17 @@ document.getElementById('btn-enhance').addEventListener('click', async () => {
     const unlocked = currentUser.unlockedCodex || [];
     if (!unlocked.includes(unlockKey)) currentUser.unlockedCodex = [...unlocked, unlockKey];
     updateUI(currentUser);
-    btn.disabled = false;
-    if (result.assignedTrack) {
-      showToast(`${TRACK_INFO[result.assignedTrack].name}에 진입했습니다!`);
+    // 페이즈(단계) 진입 지점이면 시네마틱 화면만, 그 외 일반 강화면 성공 이펙트만
+    const intro = getPhaseIntro(newLevel, currentUser.track);
+    if (intro) {
+      // 버튼은 인트로를 닫을 때까지 비활성 유지
+      showPhaseIntro(intro, () => { btn.disabled = false; });
+    } else {
+      playEnhanceSuccessEffect(newLevel);
+      btn.disabled = false;
+      if (result.assignedTrack) {
+        showToast(`${TRACK_INFO[result.assignedTrack].name}에 진입했습니다!`);
+      }
     }
   } else {
     // 실패: 서버가 pendingFailure 저장. 드랍/방지권 흐름 시작
@@ -598,6 +616,127 @@ function showToast(msg) {
     setTimeout(() => t.remove(), 350);
   }, 2200);
 }
+
+// ─── 강화 성공 이펙트 ───────────────────────────────
+
+function playEnhanceSuccessEffect(newLevel) {
+  const box = document.getElementById('star-core').closest('.star-visual');
+  if (!box) return;
+
+  box.classList.remove('enhance-success');
+  void box.offsetWidth; // 리플로우 강제 — 연속 성공 시에도 팝 애니메이션 재시작
+  box.classList.add('enhance-success');
+
+  // 이 호출에서 만든 요소만 추적 — 연속 강화 시 이전 정리 타이머가 새 이펙트를 지우지 않도록
+  const nodes = [];
+  const add = (cls, setup) => {
+    const el = document.createElement('div');
+    el.className = cls;
+    if (setup) setup(el);
+    box.appendChild(el);
+    nodes.push(el);
+  };
+
+  add('enhance-flash');
+  for (let i = 0; i < 2; i++) add('enhance-ring', el => { el.style.animationDelay = (i * 0.12) + 's'; });
+  const N = 12;
+  for (let i = 0; i < N; i++) add('enhance-particle', el => { el.style.setProperty('--ang', (i * (360 / N)) + 'deg'); });
+  if (newLevel != null) add('enhance-levelup', el => { el.textContent = `+${newLevel}강!`; });
+
+  // 자기가 만든 노드만 제거 (전체 쓸어버리지 않음)
+  setTimeout(() => { nodes.forEach(el => el.remove()); }, 950);
+}
+
+// ─── 페이즈 진입 시네마틱 ────────────────────────────
+// 별의 운명이 갈리거나(+14) 종착지에 이르거나(+21) 시야가 우주로 넓어지는(+22,+29)
+// "페이즈 전환" 순간에 웅장한 전체화면 텍스트를 띄운다. 키는 stageKey와 동일
+// (트랙 구간은 "track2_21", 공통·우주루트는 "22" 같은 순수 레벨 문자열).
+const PHASE_INTROS = {
+  // 트랙 진입 (+14) — 별의 최초 질량이 운명을 가르는 순간
+  track1_14: { kicker: '운명의 분기', title: '가장 오래 타오를 불꽃', tone: 'red',
+    desc: '적색왜성의 길에 들어섰습니다. 우주의 나이로도 끝내 다 태우지 못할, 가장 길고 고요한 여정이 시작됩니다.' },
+  track2_14: { kicker: '운명의 분기', title: '태양이 걸어갈 길', tone: 'gold',
+    desc: '태양형 별의 길에 들어섰습니다. 준거성과 적색거성을 지나, 언젠가 백색왜성으로 잠들 운명입니다.' },
+  track3_14: { kicker: '운명의 분기', title: '격렬한 최후를 향하여', tone: 'blue',
+    desc: '대질량 별의 길에 들어섰습니다. 그 끝에서 초신성 폭발과 중성자별이 기다립니다.' },
+  track4_14: { kicker: '운명의 분기', title: '빛을 삼킬 자의 씨앗', tone: 'violet',
+    desc: '초대질량 별의 길에 들어섰습니다. 볼프-레이에 별을 지나 블랙홀로 붕괴할 운명입니다.' },
+  track5_14: { kicker: '운명의 분기', title: '우주를 뒤흔들 거인', tone: 'cyan',
+    desc: '극초대질량 별의 길에 들어섰습니다. 그 최후는 우주에서 가장 밝은 퀘이사로 타오릅니다.' },
+  // 트랙 종착 (+21) — 각 별의 궁극적 종착지
+  track1_21: { kicker: '저질량 별의 종착', title: '모든 빛이 스러진 끝', tone: 'dark',
+    desc: '흑색왜성에 도달했습니다. 우주가 아직 그만큼 늙지 않아 실재하지 않는, 저질량 별의 궁극적 종착지입니다.' },
+  track2_21: { kicker: '태양형 별의 종착', title: '종말의 시작점', tone: 'gold',
+    desc: '백색왜성에 도달했습니다. 태양형 별이 걸어온 모든 길의 자연스러운 종착지입니다.' },
+  track3_21: { kicker: '대질량 별의 종착', title: '붕괴가 빚어낸 극한', tone: 'blue',
+    desc: '중성자별에 도달했습니다. 한 스푼에 수억 톤, 대질량 별 진화의 종착지입니다.' },
+  track4_21: { kicker: '초대질량 별의 종착', title: '빛조차 삼키는 심연', tone: 'violet',
+    desc: '항성질량 블랙홀이 탄생했습니다. 초대질량 별 진화의 종착지입니다.' },
+  track5_21: { kicker: '극초대질량 별의 종착', title: '우주에서 가장 밝은 등불', tone: 'cyan',
+    desc: '퀘이사가 타오릅니다. 극초대질량 별 진화의 종착지입니다.' },
+  // 우주 루트 (+22) — 별에서 우주로 시야 확장
+  '22': { kicker: '시야의 확장', title: '하나의 별에서, 우주로', tone: 'cyan',
+    desc: '당신의 별이 은하를 도는 수천억 별 중 하나가 됩니다. 이제 시야가 우주 전체로 확장됩니다.' },
+  // 최종 엔딩 (+29)
+  '29': { kicker: 'THE END', title: '우주, 그 자체', tone: 'rainbow',
+    desc: '성운의 한 점에서 시작해 마침내 우주 전체에 도달했습니다. 별 강화하기의 여정이 끝났습니다.' },
+};
+
+/** 이 레벨(+트랙) 진입이 페이즈 전환이면 인트로 데이터 반환, 아니면 null */
+function getPhaseIntro(level, track) {
+  return PHASE_INTROS[stageKey(level, track)] || null;
+}
+
+const PHASE_ANIM_MS = 1700;  // 텍스트 등장 애니메이션이 끝나 "계속" 힌트가 뜨는 시점 — 그 전엔 닫기 무시
+let _phaseDismiss = null;    // 현재 인트로를 닫을 콜백
+let _phaseReadyAt = 0;       // 이 시각 이후에만 닫기 허용 (연타/오조작으로 건너뛰기 방지)
+
+function showPhaseIntro(intro, onDone) {
+  const ov = document.getElementById('phase-overlay');
+  document.getElementById('phase-kicker').textContent = intro.kicker || '';
+  document.getElementById('phase-title').textContent  = intro.title || '';
+  document.getElementById('phase-desc').textContent   = intro.desc || '';
+  ov.className = 'phase-overlay tone-' + (intro.tone || 'dark');
+  void ov.offsetWidth; // 진입 애니메이션 재시작
+  ov.classList.add('visible');
+  _phaseReadyAt = Date.now() + PHASE_ANIM_MS;
+  _phaseDismiss = () => {
+    ov.classList.remove('visible');
+    _phaseDismiss = null;
+    if (onDone) onDone();
+  };
+}
+
+// 애니메이션이 끝나기 전(=아직 힌트가 안 뜬 동안)에는 클릭·스페이스 모두 무시한다
+function dismissPhaseIntro() {
+  if (!_phaseDismiss) return;
+  if (Date.now() < _phaseReadyAt) return;
+  _phaseDismiss();
+}
+document.getElementById('phase-overlay').addEventListener('click', dismissPhaseIntro);
+
+// ─── 스페이스바로 강화 / 페이즈 화면 넘기기 ─────────────
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Space' && e.key !== ' ') return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+
+  // 페이즈 인트로가 떠 있으면 스페이스로 넘김 (애니메이션 끝나기 전엔 dismissPhaseIntro가 무시)
+  if (document.getElementById('phase-overlay').classList.contains('visible')) {
+    e.preventDefault();
+    dismissPhaseIntro();
+    return;
+  }
+  // 강화 결과/프로필 오버레이가 떠 있으면 스페이스 무시 (방지권 선택 등 오조작 방지)
+  if (document.getElementById('result-overlay').classList.contains('visible')) return;
+  if (document.getElementById('profile-modal-bg').classList.contains('visible')) return;
+
+  const btn = document.getElementById('btn-enhance');
+  if (!btn || btn.disabled) return;
+  if (document.getElementById('enhance-section').style.display === 'none') return;
+  e.preventDefault(); // 페이지 스크롤 방지
+  btn.click();
+});
 
 // ─── 데이터 새로고침 ────────────────────────────────
 

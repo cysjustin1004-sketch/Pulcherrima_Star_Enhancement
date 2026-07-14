@@ -1,6 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const crypto = require('crypto');
-const { COMMON_STAGES, TRACKS, POST_TRACK_STAGES, stageKey } = require('../../lib/game-config');
+const { COMMON_STAGES, TRACKS, POST_TRACK_STAGES, stageKey, emailKey } = require('../../lib/game-config');
 
 // 관리자 세션 토큰 검증 헬퍼
 async function validateAdmin(req) {
@@ -102,16 +102,21 @@ async function deleteUser(req, res) {
     return res.status(400).json({ ok: false, error: '확인 문구(닉네임)가 일치하지 않습니다.' });
   }
 
-  const [friendsSnap, reqInSnap, reqOutSnap] = await Promise.all([
+  const [friendsSnap, reqInSnap, reqOutSnap, emailSnap, identitySnap] = await Promise.all([
     db.ref(`friends/${userKey}`).get(),
     db.ref(`friendRequests/${userKey}`).get(),
     db.ref(`friendRequestsSent/${userKey}`).get(),
+    db.ref(`userEmails/${userKey}`).get(),
+    db.ref(`userIdentities/${userKey}`).get(),
   ]);
+  // 마이그레이션 전 계정은 아직 users/{uid}에 studentId가 남아있을 수 있으므로 폴백.
+  const identityStudentId = (identitySnap.exists() && identitySnap.val().studentId) || user.studentId;
 
   const upd = {
     [`users/${userKey}`]: null,
     [`authSecrets/${userKey}`]: null,
     [`userEmails/${userKey}`]: null,
+    [`userIdentities/${userKey}`]: null,
     [`enhanceLogs/${userKey}`]: null,
     [`battleLogs/${userKey}`]: null,
     [`battleCounters/${userKey}`]: null,
@@ -121,11 +126,17 @@ async function deleteUser(req, res) {
     [`friendRequestsSent/${userKey}`]: null,
   };
 
+  // emailIndex/{이메일}도 함께 정리 — 안 지우면 삭제된 계정의 이메일이 여전히 "등록됨"으로
+  // 남아, 같은 구글(goedu.kr) 계정으로 재가입을 시도해도 거부되는 버그가 생긴다.
+  if (emailSnap.exists() && emailSnap.val().email) {
+    upd[`emailIndex/${emailKey(emailSnap.val().email)}`] = null;
+  }
+
   // studentIds/{학번} 인덱스도 함께 정리 — 안 지우면 삭제된 계정의 학번이 여전히
   // "등록됨"으로 남아, 같은 학번으로 재가입을 시도해도 거부되는 버그가 있었다.
   // 0000(선생님/외부인)은 애초에 이 인덱스에 없으므로 건드릴 필요 없다.
-  if (user.studentId && user.studentId !== '0000') {
-    upd[`studentIds/${user.studentId}`] = null;
+  if (identityStudentId && identityStudentId !== '0000') {
+    upd[`studentIds/${identityStudentId}`] = null;
   }
 
   // 친구 목록에 있던 상대방 쪽의 역방향 링크·대화 인덱스·대화 내용도 함께 정리
@@ -174,6 +185,8 @@ async function wipeUsers(req, res) {
     enhanceLogs: null,
     authSecrets: null,
     userEmails: null,
+    userIdentities: null,
+    emailIndex: null,
     emailVerifications: null,
     studentIds: null,
     friends: null,
@@ -209,6 +222,47 @@ async function migrateSecrets(req, res) {
   }
 
   res.json({ ok: true, migrated, totalUsers: Object.keys(users).length });
+}
+
+// 일회성 보안 마이그레이션 — 공개 읽기 경로(users/$uid.studentId, .realName)에 남아있는
+// 실명·학번을 비공개 경로(userIdentities/$uid)로 옮기고 공개 경로에서 제거한다.
+// users/$uid는 랭킹 표시를 위해 .read:true라, 여기 실명/학번이 같이 있으면 로그인 없이도
+// 전체 유저의 실명/학번이 노출된다(register()는 이미 userIdentities에 쓰도록 수정됨 —
+// 이건 그 수정 이전에 가입한 기존 계정을 일괄 정리하는 용도).
+// 겸사겸사 emailIndex/{이메일}도 기존 userEmails 기준으로 채워, "같은 구글 계정으로 계정 하나만"
+// 중복 검사가 이미 가입된 이메일에 대해서도 소급 적용되게 한다.
+async function migrateIdentities(req, res) {
+  if (!await validateAdmin(req)) {
+    return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
+  }
+
+  const [usersSnap, emailsSnap] = await Promise.all([
+    db.ref('users').get(),
+    db.ref('userEmails').get(),
+  ]);
+  const users = usersSnap.val() || {};
+  const emails = emailsSnap.val() || {};
+
+  const upd = {};
+  let migratedIdentities = 0;
+  for (const [userKey, user] of Object.entries(users)) {
+    if (user.studentId === undefined && user.realName === undefined) continue;
+    upd[`userIdentities/${userKey}`] = { studentId: user.studentId || null, realName: user.realName || null };
+    upd[`users/${userKey}/studentId`] = null;
+    upd[`users/${userKey}/realName`] = null;
+    migratedIdentities++;
+  }
+
+  let indexedEmails = 0;
+  for (const [userKey, rec] of Object.entries(emails)) {
+    if (!rec.email) continue;
+    upd[`emailIndex/${emailKey(rec.email)}`] = userKey;
+    indexedEmails++;
+  }
+
+  if (Object.keys(upd).length) await db.ref().update(upd);
+
+  res.json({ ok: true, migratedIdentities, indexedEmails, totalUsers: Object.keys(users).length });
 }
 
 // 도감 전체 항목이 해금된 테스트용 계정을 생성(또는 기존 계정을 덮어써서 갱신)한다. QA/디자인 확인용.
@@ -298,6 +352,17 @@ async function getUserEmails(req, res) {
   res.json({ ok: true, emails });
 }
 
+// 유저별 실명·학번 조회 — 관리자 전용. userIdentities는 firebase-rules.json에서
+// 공개 읽기/쓰기가 모두 차단되어 있으므로, 이 admin-token 인증 API를 거쳐야만 볼 수 있다.
+async function getUserIdentities(req, res) {
+  if (!await validateAdmin(req)) {
+    return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
+  }
+
+  const snap = await db.ref('userIdentities').get();
+  res.json({ ok: true, identities: snap.val() || {} });
+}
+
 const ROUTES = {
   'verify': verify,
   'give-hydrogen': giveHydrogen,
@@ -305,10 +370,12 @@ const ROUTES = {
   'delete-user': deleteUser,
   'wipe-users': wipeUsers,
   'migrate-secrets': migrateSecrets,
+  'migrate-identities': migrateIdentities,
   'create-cheat-account': createCheatAccount,
   'list-bugs': listBugs,
   'delete-bug': deleteBug,
   'get-user-emails': getUserEmails,
+  'get-user-identities': getUserIdentities,
 };
 
 module.exports = async (req, res) => {

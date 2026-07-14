@@ -177,55 +177,74 @@ async function protection(req, res) {
   }
 }
 
+// 모든 값 변화(수소/보관별)를 users/{userKey} 트랜잭션 안에서 계산해 커밋하므로,
+// 같은 계정으로 동시에 여러 요청을 날려도(다중 탭 등) 마지막에 커밋되는 요청이 항상
+// 최신 상태를 기준으로 재계산된다 — 읽기-확인-쓰기 사이 경합으로 인한 복제(dupe)를 막는다.
+
 async function sell(req, res) {
   const userKey = await validateSession(req);
   if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
 
-  const snap = await db.ref(`users/${userKey}`).get();
-  if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+  let errorResult = null;
+  let gained = 0;
 
-  const user = snap.val();
-  const stage = resolveStage(user.currentStar || 0, user.track);
+  const txResult = await db.ref(`users/${userKey}`).transaction(user => {
+    if (!user) { errorResult = { status: 404, error: '유저 없음' }; return; }
+    if (user.banned) { errorResult = { status: 403, error: '정지된 계정입니다.' }; return; }
 
-  if (!stage || !stage.sellPrice) {
-    return res.status(400).json({ ok: false, error: '이 별은 판매할 수 없습니다.' });
-  }
+    const stage = resolveStage(user.currentStar || 0, user.track);
+    if (!stage || !stage.sellPrice) {
+      errorResult = { status: 400, error: '이 별은 판매할 수 없습니다.' };
+      return;
+    }
 
-  await db.ref().update({
-    [`users/${userKey}/hydrogen`]:    (user.hydrogen || 0) + stage.sellPrice,
-    [`users/${userKey}/currentStar`]: 0,
+    gained = stage.sellPrice;
+    return { ...user, hydrogen: (user.hydrogen || 0) + stage.sellPrice, currentStar: 0 };
   });
 
-  res.json({ ok: true, gained: stage.sellPrice });
+  if (!txResult.committed) {
+    return res.status(errorResult ? errorResult.status : 400).json({ ok: false, error: errorResult ? errorResult.error : '처리할 수 없습니다.' });
+  }
+  res.json({ ok: true, gained });
 }
 
 async function store(req, res) {
   const userKey = await validateSession(req);
   if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
 
-  const snap = await db.ref(`users/${userKey}`).get();
-  if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+  let errorResult = null;
+  let storedLevel = 0;
 
-  const user = snap.val();
-  const level = user.currentStar || 0;
+  const txResult = await db.ref(`users/${userKey}`).transaction(user => {
+    if (!user) { errorResult = { status: 404, error: '유저 없음' }; return; }
+    if (user.banned) { errorResult = { status: 403, error: '정지된 계정입니다.' }; return; }
 
-  if (level < 1) {
-    return res.status(400).json({ ok: false, error: '+1강 이상만 보관할 수 있습니다.' });
-  }
+    const level = user.currentStar || 0;
+    if (level < 1) {
+      errorResult = { status: 400, error: '+1강 이상만 보관할 수 있습니다.' };
+      return;
+    }
 
-  const totalStored = Object.values(user.storedStars || {}).reduce((a, b) => a + b, 0);
-  if (totalStored >= INVENTORY_CAP) {
-    return res.status(400).json({ ok: false, error: `인벤토리가 가득 찼습니다 (${INVENTORY_CAP}/${INVENTORY_CAP}). 별을 판매하거나 정리해주세요.` });
-  }
+    const totalStored = Object.values(user.storedStars || {}).reduce((a, b) => a + b, 0);
+    if (totalStored >= INVENTORY_CAP) {
+      errorResult = { status: 400, error: `인벤토리가 가득 찼습니다 (${INVENTORY_CAP}/${INVENTORY_CAP}). 별을 판매하거나 정리해주세요.` };
+      return;
+    }
 
-  const key = stageKey(level, user.track);
-  const stored = (user.storedStars && user.storedStars[key]) || 0;
-  await db.ref().update({
-    [`users/${userKey}/storedStars/${key}`]: stored + 1,
-    [`users/${userKey}/currentStar`]:        0,
+    storedLevel = level;
+    const key = stageKey(level, user.track);
+    const stored = (user.storedStars && user.storedStars[key]) || 0;
+    return {
+      ...user,
+      storedStars: { ...(user.storedStars || {}), [key]: stored + 1 },
+      currentStar: 0,
+    };
   });
 
-  res.json({ ok: true, level });
+  if (!txResult.committed) {
+    return res.status(errorResult ? errorResult.status : 400).json({ ok: false, error: errorResult ? errorResult.error : '처리할 수 없습니다.' });
+  }
+  res.json({ ok: true, level: storedLevel });
 }
 
 async function sellStored(req, res) {
@@ -235,27 +254,38 @@ async function sellStored(req, res) {
   const { key } = req.body;
   if (!key) return res.status(400).json({ ok: false, error: '판매할 별을 지정하세요.' });
 
-  const snap = await db.ref(`users/${userKey}`).get();
-  if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+  let errorResult = null;
+  let gained = 0;
 
-  const user = snap.val();
-  const stored = (user.storedStars && user.storedStars[key]) || 0;
-  if (stored < 1) {
-    return res.status(400).json({ ok: false, error: '보관된 별이 없습니다.' });
-  }
+  const txResult = await db.ref(`users/${userKey}`).transaction(user => {
+    if (!user) { errorResult = { status: 404, error: '유저 없음' }; return; }
+    if (user.banned) { errorResult = { status: 403, error: '정지된 계정입니다.' }; return; }
 
-  const { level, track } = parseStageKey(key);
-  const stage = resolveStage(level, track);
-  if (!stage || !stage.sellPrice) {
-    return res.status(400).json({ ok: false, error: '이 별은 판매할 수 없습니다.' });
-  }
+    const stored = (user.storedStars && user.storedStars[key]) || 0;
+    if (stored < 1) {
+      errorResult = { status: 400, error: '보관된 별이 없습니다.' };
+      return;
+    }
 
-  await db.ref().update({
-    [`users/${userKey}/hydrogen`]:           (user.hydrogen || 0) + stage.sellPrice,
-    [`users/${userKey}/storedStars/${key}`]: stored - 1,
+    const { level, track } = parseStageKey(key);
+    const stage = resolveStage(level, track);
+    if (!stage || !stage.sellPrice) {
+      errorResult = { status: 400, error: '이 별은 판매할 수 없습니다.' };
+      return;
+    }
+
+    gained = stage.sellPrice;
+    return {
+      ...user,
+      hydrogen: (user.hydrogen || 0) + stage.sellPrice,
+      storedStars: { ...user.storedStars, [key]: stored - 1 },
+    };
   });
 
-  res.json({ ok: true, gained: stage.sellPrice, key });
+  if (!txResult.committed) {
+    return res.status(errorResult ? errorResult.status : 400).json({ ok: false, error: errorResult ? errorResult.error : '처리할 수 없습니다.' });
+  }
+  res.json({ ok: true, gained, key });
 }
 
 async function load(req, res) {
@@ -265,44 +295,55 @@ async function load(req, res) {
   const { key } = req.body;
   if (!key) return res.status(400).json({ ok: false, error: '불러올 별을 지정하세요.' });
 
-  const snap = await db.ref(`users/${userKey}`).get();
-  if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+  let errorResult = null;
+  let newLevel = 0;
+  let newTrack = null;
+  let autoStored = false;
 
-  const user = snap.val();
-  const storedStars = { ...(user.storedStars || {}) };
-  const have = storedStars[key] || 0;
-  if (have < 1) {
-    return res.status(400).json({ ok: false, error: '보관된 별이 없습니다.' });
+  const txResult = await db.ref(`users/${userKey}`).transaction(user => {
+    if (!user) { errorResult = { status: 404, error: '유저 없음' }; return; }
+    if (user.banned) { errorResult = { status: 403, error: '정지된 계정입니다.' }; return; }
+
+    const storedStars = { ...(user.storedStars || {}) };
+    const have = storedStars[key] || 0;
+    if (have < 1) {
+      errorResult = { status: 400, error: '보관된 별이 없습니다.' };
+      return;
+    }
+
+    const parsed = parseStageKey(key);
+    const newStage = resolveStage(parsed.level, parsed.track);
+    if (!newStage) {
+      errorResult = { status: 400, error: '유효하지 않은 별입니다.' };
+      return;
+    }
+
+    const curLevel = user.currentStar || 0;
+
+    // 강화 중이던 별이 있으면 자동으로 보관함에 넣는다(스왑) — 총 개수 변화가 없어 용량 체크 불필요
+    if (curLevel > 0) {
+      const curKey = stageKey(curLevel, user.track);
+      storedStars[curKey] = (storedStars[curKey] || 0) + 1;
+    }
+
+    // 불러오는 별은 보관함에서 차감
+    storedStars[key] = storedStars[key] - 1;
+    if (storedStars[key] <= 0) delete storedStars[key];
+
+    newLevel = parsed.level;
+    newTrack = parsed.track;
+    autoStored = curLevel > 0;
+
+    const next = { ...user, storedStars, currentStar: newLevel };
+    // 공통/우주루트 별(track null)은 기존 트랙 유지, 트랙 별은 그 트랙으로 전환
+    if (newTrack) next.track = newTrack;
+    return next;
+  });
+
+  if (!txResult.committed) {
+    return res.status(errorResult ? errorResult.status : 400).json({ ok: false, error: errorResult ? errorResult.error : '처리할 수 없습니다.' });
   }
-
-  const { level: newLevel, track: newTrack } = parseStageKey(key);
-  const newStage = resolveStage(newLevel, newTrack);
-  if (!newStage) {
-    return res.status(400).json({ ok: false, error: '유효하지 않은 별입니다.' });
-  }
-
-  const curLevel = user.currentStar || 0;
-
-  // 강화 중이던 별이 있으면 자동으로 보관함에 넣는다(스왑) — 총 개수 변화가 없어 용량 체크 불필요
-  if (curLevel > 0) {
-    const curKey = stageKey(curLevel, user.track);
-    storedStars[curKey] = (storedStars[curKey] || 0) + 1;
-  }
-
-  // 불러오는 별은 보관함에서 차감
-  storedStars[key] = (storedStars[key] || 0) - 1;
-  if (storedStars[key] <= 0) delete storedStars[key];
-
-  const upd = {
-    [`users/${userKey}/storedStars`]: storedStars,
-    [`users/${userKey}/currentStar`]: newLevel,
-  };
-  // 공통/우주루트 별(track null)은 기존 트랙 유지, 트랙 별은 그 트랙으로 전환
-  if (newTrack) upd[`users/${userKey}/track`] = newTrack;
-
-  await db.ref().update(upd);
-
-  res.json({ ok: true, level: newLevel, track: newTrack, autoStored: curLevel > 0 });
+  res.json({ ok: true, level: newLevel, track: newTrack, autoStored });
 }
 
 async function setProfilePic(req, res) {

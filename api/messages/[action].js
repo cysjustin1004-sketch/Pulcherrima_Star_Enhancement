@@ -1,5 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
+const { withActionLog } = require('../../lib/action-log');
 
 function convId(a, b) {
   return [a, b].sort().join('__');
@@ -131,8 +132,9 @@ const ROUTES = { conversations, history, send, report };
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const handler = ROUTES[req.query.action];
+  const action = req.query.action;
+  const handler = ROUTES[action];
   if (!handler) return res.status(404).json({ ok: false, error: 'Not found' });
 
-  return handler(req, res);
+  return withActionLog(req, res, `messages/${action}`, handler);
 };

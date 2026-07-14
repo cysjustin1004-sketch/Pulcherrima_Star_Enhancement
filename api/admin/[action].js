@@ -118,6 +118,7 @@ async function deleteUser(req, res) {
     [`userEmails/${userKey}`]: null,
     [`userIdentities/${userKey}`]: null,
     [`enhanceLogs/${userKey}`]: null,
+    [`actionLogs/${userKey}`]: null,
     [`battleLogs/${userKey}`]: null,
     [`battleCounters/${userKey}`]: null,
     [`messageIndex/${userKey}`]: null,
@@ -183,6 +184,7 @@ async function wipeUsers(req, res) {
   await db.ref().update({
     users: null,
     enhanceLogs: null,
+    actionLogs: null,
     authSecrets: null,
     userEmails: null,
     userIdentities: null,
@@ -363,6 +365,28 @@ async function getUserIdentities(req, res) {
   res.json({ ok: true, identities: snap.val() || {} });
 }
 
+// 유저별 전체 행동 로그 조회 — 관리자 전용. actionLogs는 firebase-rules.json에서
+// 공개 읽기/쓰기가 모두 차단되어 있으므로, 이 admin-token 인증 API를 거쳐야만 볼 수 있다.
+// enhanceLogs(강화 성공/실패만)와 달리, 상점 구매·조합·친구·메시지 등 모든 API 호출이
+// 시간순으로 남아 있어 "정확히 무슨 버튼을 눌러서 뭘 했는지" 재구성할 수 있다.
+async function getActionLog(req, res) {
+  if (!await validateAdmin(req)) {
+    return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
+  }
+
+  const { userKey, limit } = req.body;
+  if (!userKey) return res.status(400).json({ ok: false, error: 'userKey를 입력하세요.' });
+
+  const n = Math.max(1, Math.min(500, limit || 200));
+  const snap = await db.ref(`actionLogs/${userKey}`).limitToLast(n).get();
+  const raw = snap.val() || {};
+  const logs = Object.entries(raw)
+    .map(([key, r]) => ({ key, ...r }))
+    .sort((a, b) => (b.at || 0) - (a.at || 0));
+
+  res.json({ ok: true, logs });
+}
+
 const ROUTES = {
   'verify': verify,
   'give-hydrogen': giveHydrogen,
@@ -376,6 +400,7 @@ const ROUTES = {
   'delete-bug': deleteBug,
   'get-user-emails': getUserEmails,
   'get-user-identities': getUserIdentities,
+  'get-action-log': getActionLog,
 };
 
 module.exports = async (req, res) => {

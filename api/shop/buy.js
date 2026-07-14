@@ -1,12 +1,11 @@
 const { validateSession } = require('../../lib/session');
 const { atomicUpdate } = require('../../lib/atomic-update');
+const { withActionLog } = require('../../lib/action-log');
 const { SHOP_ITEMS, stageKey, TRACK_INFO } = require('../../lib/game-config');
 
 const TRACK_KEYS = Object.keys(TRACK_INFO);
 
-module.exports = async (req, res) => {
-  if (req.method !== 'POST') return res.status(405).end();
-
+async function buy(req, res) {
   const userKey = await validateSession(req);
   if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
 
@@ -85,4 +84,9 @@ module.exports = async (req, res) => {
   }
 
   res.json(outcome);
+}
+
+module.exports = async (req, res) => {
+  if (req.method !== 'POST') return res.status(405).end();
+  return withActionLog(req, res, 'shop/buy', buy);
 };

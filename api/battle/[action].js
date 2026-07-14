@@ -1,6 +1,7 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
 const { atomicUpdate } = require('../../lib/atomic-update');
+const { withActionLog } = require('../../lib/action-log');
 const { resolveStage, battleWinProb, BATTLE_STAKE_RATE, BATTLE_DAILY_CAP, parseStageKey } = require('../../lib/game-config');
 
 function todayUTCBucket() {
@@ -322,8 +323,9 @@ const ROUTES = { preview, execute, history, profile, setStar, notifications };
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const handler = ROUTES[req.query.action];
+  const action = req.query.action;
+  const handler = ROUTES[action];
   if (!handler) return res.status(404).json({ ok: false, error: 'Not found' });
 
-  return handler(req, res);
+  return withActionLog(req, res, `battle/${action}`, handler);
 };

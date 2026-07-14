@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const db = require('../../lib/firebase-admin');
 const { createSession } = require('../../lib/session');
+const { withActionLog } = require('../../lib/action-log');
 const { STARTING_HYDROGEN, nicknameToKey, emailKey } = require('../../lib/game-config');
 const { sendVerificationCode } = require('../../lib/mailer');
 const { isRateLimited } = require('../../lib/rate-limit');
@@ -249,8 +250,9 @@ const ROUTES = {
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const handler = ROUTES[req.query.action];
+  const action = req.query.action;
+  const handler = ROUTES[action];
   if (!handler) return res.status(404).json({ ok: false, error: 'Not found' });
 
-  return handler(req, res);
+  return withActionLog(req, res, `auth/${action}`, handler);
 };

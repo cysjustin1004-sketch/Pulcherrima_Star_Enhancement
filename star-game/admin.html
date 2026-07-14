@@ -106,6 +106,16 @@
       <div id="log-list" style="display:flex; flex-direction:column; gap:0.35rem; max-height:300px; overflow-y:auto;"></div>
       <button class="btn-secondary" style="width:100%; margin-top:0.75rem;" id="btn-close-log">닫기</button>
     </div>
+
+    <!-- 전체 행동 로그 조회 (어떤 API를 호출했는지 전부) -->
+    <div class="card" id="action-log-section" style="display:none;">
+      <div class="card-title">전체 행동 로그 — <span id="action-log-user-name"></span></div>
+      <div style="font-size:0.8rem; color:var(--text-sub); margin-bottom:0.5rem;">
+        강화뿐 아니라 상점 구매·조합·친구·메시지 등 이 계정이 서버에 보낸 요청을 시간순(최신순)으로 보여줍니다.
+      </div>
+      <div id="action-log-list" style="display:flex; flex-direction:column; gap:0.35rem; max-height:400px; overflow-y:auto;"></div>
+      <button class="btn-secondary" style="width:100%; margin-top:0.75rem;" id="btn-close-action-log">닫기</button>
+    </div>
   </div>
 </div>
 
@@ -315,14 +325,16 @@ function renderUserList(users) {
         </div>
       </div>
       <div style="display:flex;gap:0.4rem;flex-shrink:0;flex-wrap:wrap;">
-        <button class="btn-outline" style="font-size:0.78rem; padding:0.4rem 0.7rem;">로그</button>
+        <button class="btn-outline" style="font-size:0.78rem; padding:0.4rem 0.7rem;">강화로그</button>
+        <button class="btn-outline" style="font-size:0.78rem; padding:0.4rem 0.7rem;">전체로그</button>
         <button class="${isBanned ? 'btn-secondary' : 'btn-danger'}" style="font-size:0.78rem; padding:0.4rem 0.7rem;">${isBanned ? '벤 해제' : '벤'}</button>
         <button class="btn-danger" style="font-size:0.78rem; padding:0.4rem 0.7rem;">삭제</button>
       </div>
     `;
 
-    const [btnLog, btnBan, btnDelete] = row.querySelectorAll('button');
+    const [btnLog, btnActionLog, btnBan, btnDelete] = row.querySelectorAll('button');
     btnLog.addEventListener('click', () => viewLogs(user.key, user.nickname || user.key));
+    btnActionLog.addEventListener('click', () => viewActionLog(user.key, user.nickname || user.key));
     btnBan.addEventListener('click', () => toggleBan(user.key, user.nickname || user.key, isBanned));
     btnDelete.addEventListener('click', () => deleteUser(user.key, user.nickname || user.key));
 
@@ -364,6 +376,55 @@ async function viewLogs(userKey, nickname) {
 
 document.getElementById('btn-close-log').addEventListener('click', () => {
   document.getElementById('log-section').style.display = 'none';
+});
+
+// ─── 전체 행동 로그 조회 ─────────────────────────────
+
+async function viewActionLog(userKey, nickname) {
+  const section = document.getElementById('action-log-section');
+  const list    = document.getElementById('action-log-list');
+  document.getElementById('action-log-user-name').textContent = nickname;
+  list.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem;">로딩 중...</div>';
+  section.style.display = '';
+
+  const res = await fetch('/api/admin/get-action-log', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'X-Admin-Token': adminToken || '',
+    },
+    body: JSON.stringify({ userKey }),
+  });
+  const data = await res.json();
+
+  if (!data.ok || !data.logs || data.logs.length === 0) {
+    list.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem;">기록 없음</div>';
+    return;
+  }
+
+  list.innerHTML = '';
+  data.logs.forEach(log => {
+    const dt = new Date(log.at).toLocaleString('ko-KR');
+    const okColor = log.ok === false ? 'var(--danger)' : (log.ok === true ? 'var(--success)' : 'var(--text-sub)');
+    const bodyStr = log.body ? JSON.stringify(log.body) : '';
+    const entry = document.createElement('div');
+    entry.style.cssText = 'font-size:0.78rem; padding:0.4rem 0; border-bottom:1px solid var(--border);';
+    entry.innerHTML = `
+      <div>
+        <span style="color:var(--text-sub);">${dt}</span>
+        <span style="margin-left:0.5rem; font-weight:700;">${escapeHtml(log.route)}</span>
+        <span style="margin-left:0.5rem; color:${okColor}; font-weight:700;">${log.ok === false ? '실패' : (log.ok === true ? '성공' : '-')}</span>
+        <span style="margin-left:0.5rem; color:var(--text-sub);">${log.status || ''}</span>
+      </div>
+      ${bodyStr ? `<div style="color:var(--text-sub); word-break:break-all;">${escapeHtml(bodyStr)}</div>` : ''}
+      ${log.error ? `<div style="color:var(--danger);">${escapeHtml(log.error)}</div>` : ''}
+    `;
+    list.appendChild(entry);
+  });
+}
+
+document.getElementById('btn-close-action-log').addEventListener('click', () => {
+  document.getElementById('action-log-section').style.display = 'none';
 });
 
 // ─── 수소 지급 ──────────────────────────────────────

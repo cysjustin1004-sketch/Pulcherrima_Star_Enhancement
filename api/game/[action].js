@@ -1,6 +1,7 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
 const { atomicUpdate } = require('../../lib/atomic-update');
+const { withActionLog } = require('../../lib/action-log');
 const { resolveStage, stageKey, parseStageKey, ITEM_NAMES, TRACK_INFO, INVENTORY_CAP, RATE_LIMIT } = require('../../lib/game-config');
 const { isRateLimited } = require('../../lib/rate-limit');
 
@@ -402,8 +403,9 @@ const ROUTES = { enhance, protection, sell, store, sellStored, load, setProfileP
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const handler = ROUTES[req.query.action];
+  const action = req.query.action;
+  const handler = ROUTES[action];
   if (!handler) return res.status(404).json({ ok: false, error: 'Not found' });
 
-  return handler(req, res);
+  return withActionLog(req, res, `game/${action}`, handler);
 };

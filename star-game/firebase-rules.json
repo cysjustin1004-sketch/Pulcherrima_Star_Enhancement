@@ -64,6 +64,11 @@
       ".write": false
     },
 
+    "actionLogs": {
+      ".read": false,
+      ".write": false
+    },
+
     "userEmails": {
       ".read": false,
       ".write": false

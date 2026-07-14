@@ -1,6 +1,7 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
 const { nicknameToKey } = require('../../lib/game-config');
+const { withActionLog } = require('../../lib/action-log');
 
 async function list(req, res) {
   const userKey = await validateSession(req);
@@ -217,8 +218,9 @@ const ROUTES = { list, request, respond, search, cancel };
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();
 
-  const handler = ROUTES[req.query.action];
+  const action = req.query.action;
+  const handler = ROUTES[action];
   if (!handler) return res.status(404).json({ ok: false, error: 'Not found' });
 
-  return handler(req, res);
+  return withActionLog(req, res, `friends/${action}`, handler);
 };

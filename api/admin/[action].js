@@ -207,11 +207,9 @@ async function createCheatAccount(req, res) {
     return res.status(401).json({ ok: false, error: '관리자 인증이 필요합니다.' });
   }
 
-  const studentId = (req.body.studentId || '9999').trim();
-  const realName = (req.body.realName || 'cheat').trim();
+  const nickname = (req.body.nickname || 'cheat').trim();
   const password = req.body.password || 'cheat1234';
-  const nickname = `${studentId} ${realName}`;
-  const userKey = studentId.toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
+  const userKey = nickname.toLowerCase().replace(/[^a-z0-9가-힣]/g, '_');
 
   const allKeys = [
     ...COMMON_STAGES.map(s => stageKey(s.level, null)),
@@ -222,8 +220,6 @@ async function createCheatAccount(req, res) {
   const passwordHash = crypto.createHash('sha256').update(password).digest('hex');
   await db.ref(`authSecrets/${userKey}`).set({ passwordHash });
   await db.ref(`users/${userKey}`).set({
-    studentId,
-    realName,
     nickname,
     isCheat: true,
     hydrogen: 999999999999,

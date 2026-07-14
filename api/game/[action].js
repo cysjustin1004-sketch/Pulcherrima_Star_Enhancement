@@ -1,5 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
+const { atomicUpdate } = require('../../lib/atomic-update');
 const { resolveStage, stageKey, parseStageKey, ITEM_NAMES, TRACK_INFO, INVENTORY_CAP, RATE_LIMIT } = require('../../lib/game-config');
 const { isRateLimited } = require('../../lib/rate-limit');
 
@@ -18,15 +19,15 @@ async function enhance(req, res) {
   // 전부 "차감 전" 스냅샷을 읽어 비용 검증을 통과한 뒤 마지막에 쓴 값만 반영되는
   // 레이스 컨디션이 생긴다 — 비용은 1번만 나가는데 성공/실패 판정(RNG)은 요청마다
   // 독립적으로 굴러가서, 동시 요청을 많이 보낼수록 사실상 "1번 결제로 여러 번
-  // 재도전"하는 것과 같아진다. transaction()으로 읽기·검증·쓰기를 원자적으로 묶어
-  // 이 레이스를 원천 차단한다 — 충돌이 감지되면 Firebase가 최신 값으로 자동 재시도한다.
+  // 재도전"하는 것과 같아진다. atomicUpdate()(ETag 조건부 쓰기)로 읽기·검증·쓰기를
+  // 원자적으로 묶어 이 레이스를 원천 차단한다 — 충돌이 감지되면 최신 값으로 자동 재시도한다.
   let outcome = null; // { error, status } 또는 { success, drop, level, assignedTrack }
 
-  const txResult = await db.ref(`users/${userKey}`).transaction((user) => {
-    if (user === null) return; // 유저 없음 — abort, 바깥에서 404 처리
+  const txResult = await atomicUpdate(`users/${userKey}`, (user) => {
+    if (user === null) return undefined; // 유저 없음 — abort, 바깥에서 404 처리
     if (user.banned) {
       outcome = { error: '정지된 계정입니다.', status: 403 };
-      return; // abort — 데이터 변경 없음
+      return undefined;
     }
 
     const level = user.currentStar || 0;
@@ -34,7 +35,7 @@ async function enhance(req, res) {
     const stage = resolveStage(level, track);
     if (!stage || stage.cost === null) {
       outcome = { error: '강화할 수 없는 단계입니다.', status: 400 };
-      return;
+      return undefined;
     }
 
     const cost = stage.cost;
@@ -43,13 +44,13 @@ async function enhance(req, res) {
     if (cost.type === 'hydrogen') {
       if ((user.hydrogen || 0) < cost.amount) {
         outcome = { error: '수소가 부족합니다.', status: 400 };
-        return;
+        return undefined;
       }
     } else if (cost.type === 'item') {
       const held = (user.items && user.items[cost.key]) || 0;
       if (held < cost.amount) {
         outcome = { error: `${ITEM_NAMES[cost.key]}이(가) ${cost.amount}개 필요합니다.`, status: 400 };
-        return;
+        return undefined;
       }
     } else if (cost.type === 'star') {
       // 트랙 무관하게 인정 — 트랙이 매번 랜덤 배정되므로 어느 트랙에서 보관했든 레벨만 맞으면 재료로 인정.
@@ -57,12 +58,12 @@ async function enhance(req, res) {
         + ((user.storedStars && user.storedStars[String(cost.level)]) || 0);
       if (stored < cost.amount) {
         outcome = { error: `+${cost.level}강 별이 ${cost.amount}개 필요합니다.`, status: 400 };
-        return;
+        return undefined;
       }
     }
 
-    // transaction 콜백은 충돌 시 최신 데이터로 재호출될 수 있으므로, 매번 user를
-    // 얕은 복제해 다음 상태(next)를 구성한다 — 이전 호출의 잔여 상태가 섞이지 않는다.
+    // 충돌 시 최신 데이터로 재호출될 수 있으므로, 매번 user를 얕은 복제해
+    // 다음 상태(next)를 구성한다 — 이전 호출의 잔여 상태가 섞이지 않는다.
     const next = { ...user, items: { ...(user.items || {}) }, storedStars: { ...(user.storedStars || {}) } };
 
     // 성공/실패 판정 — 이 콜백이 최종적으로 커밋되는 그 시점의 호출 결과만 반영된다

@@ -66,6 +66,9 @@
     <!-- 유저 목록 -->
     <div class="card">
       <div class="card-title">전체 유저 목록</div>
+      <div class="form-group">
+        <input type="text" id="user-search" placeholder="닉네임 또는 학번으로 검색">
+      </div>
       <div id="user-list">
         <div style="color:var(--text-sub); font-size:0.9rem;">로딩 중...</div>
       </div>
@@ -226,6 +229,9 @@ async function deleteBugReport(key) {
 
 // ─── 유저 목록 로드 ─────────────────────────────────
 
+let allUsers  = [];
+let allEmails = {};
+
 async function loadUsers() {
   const userList = document.getElementById('user-list');
   userList.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem;">로딩 중...</div>';
@@ -240,18 +246,44 @@ async function loadUsers() {
       body:    JSON.stringify({}),
     }).then(r => r.json()).catch(() => ({ ok: false })),
   ]);
-  const emails = (emailRes && emailRes.ok) ? emailRes.emails : {};
+  allEmails = (emailRes && emailRes.ok) ? emailRes.emails : {};
 
   if (!snap) {
+    allUsers = [];
     userList.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem;">유저가 없습니다.</div>';
     return;
   }
 
-  const users = Object.entries(snap)
+  allUsers = Object.entries(snap)
     .map(([key, data]) => ({ key, ...data }))
     .sort((a, b) => (b.bestStar || 0) - (a.bestStar || 0));
 
+  applyUserSearch();
+}
+
+/** 검색창 입력값으로 allUsers를 닉네임/학번 기준 필터링해 다시 그린다 */
+function applyUserSearch() {
+  const q = document.getElementById('user-search').value.trim().toLowerCase();
+  const filtered = q
+    ? allUsers.filter(u =>
+        (u.nickname || '').toLowerCase().includes(q) ||
+        (u.studentId || '').toLowerCase().includes(q))
+    : allUsers;
+  renderUserList(filtered);
+}
+
+document.getElementById('user-search').addEventListener('input', applyUserSearch);
+
+function renderUserList(users) {
+  const emails = allEmails; // 기존 렌더링 코드가 참조하는 이름을 그대로 유지
+  const userList = document.getElementById('user-list');
   userList.innerHTML = '';
+
+  if (users.length === 0) {
+    userList.innerHTML = '<div style="color:var(--text-sub); font-size:0.9rem;">검색 결과가 없습니다.</div>';
+    return;
+  }
+
   users.forEach(user => {
     const row = document.createElement('div');
     row.className = 'admin-user-row';
@@ -259,6 +291,7 @@ async function loadUsers() {
     row.innerHTML = `
       <div class="admin-user-info">
         <div class="admin-user-nick">${escapeHtml(user.nickname || user.key)}${isBanned ? ' <span style="color:var(--danger);font-size:0.75rem;">[벤]</span>' : ''}${user.isCheat ? ' <span style="color:var(--blue);font-size:0.75rem;">[치트]</span>' : ''}</div>
+        <div class="admin-user-stat">학번 ${escapeHtml(user.studentId || '-')}${user.realName ? ' (' + escapeHtml(user.realName) + ')' : ''}</div>
         <div class="admin-user-stat">📧 ${escapeHtml(emails[user.key] || '(미등록)')}</div>
         <div class="admin-user-stat">
           💧 ${formatNumber(user.hydrogen || 0)} · ⭐ +${user.currentStar || 0} · 최고 +${user.bestStar || 0} · 방지권 ${user.protectionScrolls || 0}

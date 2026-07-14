@@ -121,6 +121,13 @@ async function deleteUser(req, res) {
     [`friendRequestsSent/${userKey}`]: null,
   };
 
+  // studentIds/{학번} 인덱스도 함께 정리 — 안 지우면 삭제된 계정의 학번이 여전히
+  // "등록됨"으로 남아, 같은 학번으로 재가입을 시도해도 거부되는 버그가 있었다.
+  // 0000(선생님/외부인)은 애초에 이 인덱스에 없으므로 건드릴 필요 없다.
+  if (user.studentId && user.studentId !== '0000') {
+    upd[`studentIds/${user.studentId}`] = null;
+  }
+
   // 친구 목록에 있던 상대방 쪽의 역방향 링크·대화 인덱스·대화 내용도 함께 정리
   if (friendsSnap.exists()) {
     friendsSnap.forEach(child => {

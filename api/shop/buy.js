@@ -22,6 +22,10 @@ module.exports = async (req, res) => {
 
   const txResult = await atomicUpdate(`users/${userKey}`, (user) => {
     if (user === null) return undefined; // 유저 없음 — abort, 바깥에서 404 처리
+    if (user.banned) {
+      outcome = { error: '정지된 계정입니다.', status: 403 };
+      return undefined;
+    }
 
     if ((user.hydrogen || 0) < item.price) {
       outcome = { error: '수소가 부족합니다.', status: 400 };

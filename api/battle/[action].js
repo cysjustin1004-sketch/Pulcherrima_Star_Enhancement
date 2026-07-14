@@ -1,5 +1,6 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
+const { atomicUpdate } = require('../../lib/atomic-update');
 const { resolveStage, battleWinProb, BATTLE_STAKE_RATE, BATTLE_DAILY_CAP, parseStageKey } = require('../../lib/game-config');
 
 function todayUTCBucket() {
@@ -103,11 +104,11 @@ async function execute(req, res) {
   if (!oppSnap.exists()) return res.status(404).json({ ok: false, error: '상대를 찾을 수 없습니다.' });
   if (oppSnap.val().banned) return res.status(403).json({ ok: false, error: '정지된 사용자입니다.' });
 
-  // ── 하루 캡: transaction으로 원자적 증가 (레이스 방지) ──
-  const counterRef = db.ref(`battleCounters/${userKey}/${opponentKey}/${todayUTCBucket()}`);
-  const txResult = await counterRef.transaction(current => {
+  // ── 하루 캡: atomicUpdate(ETag 조건부 쓰기)로 원자적 증가 (레이스 방지) ──
+  const counterPath = `battleCounters/${userKey}/${opponentKey}/${todayUTCBucket()}`;
+  const txResult = await atomicUpdate(counterPath, (current) => {
     const c = current || 0;
-    if (c >= BATTLE_DAILY_CAP) return; // undefined 반환 → 트랜잭션 중단
+    if (c >= BATTLE_DAILY_CAP) return undefined; // abort — 캡 초과
     return c + 1;
   });
   if (!txResult.committed) {
@@ -129,32 +130,39 @@ async function execute(req, res) {
   const meHydrogen  = me.hydrogen  || 0;
   const oppHydrogen = opp.hydrogen || 0;
   const loserHydrogen = win ? oppHydrogen : meHydrogen;
+  // transfer 비율은 위에서 이미 읽은 스냅샷 기준(근사치) — 정확한 최종 반영은 아래
+  // 트랜잭션에서 델타(+=/-=)로 적용하므로, 동시 배틀/구매 등으로 값이 그 사이 바뀌어도
+  // 이미 적용된 델타가 두 번 적용되는 식의 복제(dupe)는 발생하지 않는다.
   const transfer = Math.max(0, Math.min(Math.floor(loserHydrogen * BATTLE_STAKE_RATE), loserHydrogen));
+  const hydrogenDelta = win ? transfer : -transfer;
 
-  let myNewHydrogen, oppNewHydrogen, hydrogenDelta;
-  if (win) {
-    myNewHydrogen  = meHydrogen  + transfer;
-    oppNewHydrogen = Math.max(0, oppHydrogen - transfer);
-    hydrogenDelta  = transfer;
-  } else {
-    myNewHydrogen  = Math.max(0, meHydrogen - transfer);
-    oppNewHydrogen = oppHydrogen + transfer;
-    hydrogenDelta  = -transfer;
-  }
+  // 공격자·수비자는 서로 다른 users/{key} 노드라 하나의 업데이트로 묶을 수 없다.
+  // 대신 각자의 노드를 독립된 atomicUpdate로 처리해, 그 계정에 동시에 들어오는 다른
+  // 요청(다른 상대와의 배틀, 상점 구매 등)과 경합해도 델타가 유실되지 않게 한다.
+  const [myTx, oppTx] = await Promise.all([
+    atomicUpdate(`users/${userKey}`, (u) => {
+      if (!u) return undefined;
+      const hydrogen = win ? (u.hydrogen || 0) + transfer : Math.max(0, (u.hydrogen || 0) - transfer);
+      return {
+        ...u,
+        hydrogen,
+        battleWins: (u.battleWins || 0) + (win ? 1 : 0),
+        battleLosses: (u.battleLosses || 0) + (win ? 0 : 1),
+      };
+    }),
+    atomicUpdate(`users/${opponentKey}`, (u) => {
+      if (!u) return undefined;
+      const hydrogen = win ? Math.max(0, (u.hydrogen || 0) - transfer) : (u.hydrogen || 0) + transfer;
+      return {
+        ...u,
+        hydrogen,
+        battleWins: (u.battleWins || 0) + (win ? 0 : 1),
+        battleLosses: (u.battleLosses || 0) + (win ? 1 : 0),
+      };
+    }),
+  ]);
 
-  const myWins    = (me.battleWins    || 0) + (win ? 1 : 0);
-  const myLosses  = (me.battleLosses  || 0) + (win ? 0 : 1);
-  const oppWins   = (opp.battleWins   || 0) + (win ? 0 : 1);
-  const oppLosses = (opp.battleLosses || 0) + (win ? 1 : 0);
-
-  await db.ref().update({
-    [`users/${userKey}/hydrogen`]:        myNewHydrogen,
-    [`users/${userKey}/battleWins`]:      myWins,
-    [`users/${userKey}/battleLosses`]:    myLosses,
-    [`users/${opponentKey}/hydrogen`]:     oppNewHydrogen,
-    [`users/${opponentKey}/battleWins`]:   oppWins,
-    [`users/${opponentKey}/battleLosses`]: oppLosses,
-  });
+  const myNewHydrogen = myTx.committed ? myTx.value.hydrogen : meHydrogen;
 
   const at = Date.now();
   await Promise.all([
@@ -213,11 +221,13 @@ async function profile(req, res) {
   if (!oppSnap.exists()) return res.status(404).json({ ok: false, error: '존재하지 않는 사용자입니다.' });
   const opp = oppSnap.val();
 
-  const [friendSnap, pendingOutSnap, pendingInSnap] = await Promise.all([
+  const [friendSnap, pendingOutSnap, pendingInSnap, identitySnap] = await Promise.all([
     db.ref(`friends/${userKey}/${opponentKey}`).get(),
     db.ref(`friendRequests/${opponentKey}/${userKey}`).get(), // 내가 상대에게 보낸 요청
     db.ref(`friendRequests/${userKey}/${opponentKey}`).get(), // 상대가 나에게 보낸 요청
+    db.ref(`userIdentities/${opponentKey}`).get(), // 실명·학번은 비공개 노드에서 별도 조회
   ]);
+  const identity = identitySnap.exists() ? identitySnap.val() : {};
 
   // 프로필 사진 — 유저가 도감에서 직접 골라둔 별이 있으면 그걸, 없으면 현재 강화 중인
   // 별을 기본값으로 쓴다. 여러 명이 동시에 강화하는 상황에서 사진이 계속 바뀌는 걸
@@ -244,8 +254,8 @@ async function profile(req, res) {
   res.json({
     ok: true,
     nickname: opp.nickname,
-    studentId: opp.studentId || null,
-    realName: opp.realName || null,
+    studentId: identity.studentId || null,
+    realName: identity.realName || null,
     currentStar: opp.currentStar || 0,
     track: opp.track || null,
     picLevel,

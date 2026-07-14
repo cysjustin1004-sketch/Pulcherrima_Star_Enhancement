@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const db = require('../../lib/firebase-admin');
 const { createSession } = require('../../lib/session');
-const { STARTING_HYDROGEN, nicknameToKey } = require('../../lib/game-config');
+const { STARTING_HYDROGEN, nicknameToKey, emailKey } = require('../../lib/game-config');
 const { sendVerificationCode } = require('../../lib/mailer');
 const { isRateLimited } = require('../../lib/rate-limit');
 
@@ -14,10 +14,6 @@ const MAX_ATTEMPTS  = 5;              // 코드 오답 허용 횟수
 const MAX_SENDS     = 5;              // 이메일당 시간당 발송 상한
 const SEND_WINDOW   = 60 * 60 * 1000; // 발송 상한 집계 윈도우 1시간
 const VERIFY_WINDOW = 30 * 60 * 1000; // 인증 완료 후 register가 유효하다고 인정하는 시간
-
-function emailKey(email) {
-  return Buffer.from(email.trim().toLowerCase()).toString('base64url');
-}
 
 async function login(req, res) {
   const { nickname, passwordHash } = req.body;
@@ -189,9 +185,21 @@ async function register(req, res) {
     return res.status(409).json({ ok: false, error: '이미 사용 중인 닉네임입니다.' });
   }
 
+  // 같은 구글(goedu.kr) 계정으로는 계정을 하나만 만들 수 있도록 emailIndex/{이메일}로 중복 검사.
+  // userEmails는 userKey→email(관리자 조회용) 방향이라 반대 방향 조회(email→userKey)가 안 되므로
+  // 별도 인덱스가 필요하다.
+  const emailIdxSnap = await db.ref(`emailIndex/${eKey}`).get();
+  if (emailIdxSnap.exists()) {
+    return res.status(409).json({ ok: false, error: '이미 이 이메일로 가입된 계정이 있습니다.' });
+  }
+
   const upd = {
     [`userEmails/${userKey}`]: { email: mail, verifiedAt: ev.verifiedAt },
+    [`emailIndex/${eKey}`]: userKey,
     [`emailVerifications/${eKey}`]: null, // 인증 기록 소비(재사용 방지)
+    // 실명·학번은 공개 읽기(users/$uid)와 분리된 비공개 노드에 저장 — users/$uid는
+    // 랭킹 표시를 위해 .read:true라, 여기 같이 두면 로그인 없이도 전체 실명/학번이 노출된다.
+    [`userIdentities/${userKey}`]: { studentId: sid, realName: name },
   };
 
   // 0000(선생님/외부인)은 여러 명이 공유할 수 있어 중복 검사에서 제외 — 그 외 학번은
@@ -210,8 +218,6 @@ async function register(req, res) {
   upd[`authSecrets/${userKey}`] = { passwordHash };
   upd[`users/${userKey}`] = {
     nickname: nick,
-    studentId: sid,
-    realName: name,
     hydrogen: STARTING_HYDROGEN,
     currentStar: 0,
     bestStar: 0,

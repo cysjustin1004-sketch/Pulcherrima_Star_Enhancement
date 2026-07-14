@@ -102,9 +102,13 @@ async function report(req, res) {
   const userKey = await validateSession(req);
   if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
 
-  const meSnap = await db.ref(`users/${userKey}`).get();
+  const [meSnap, identitySnap] = await Promise.all([
+    db.ref(`users/${userKey}`).get(),
+    db.ref(`userIdentities/${userKey}`).get(),
+  ]);
   if (!meSnap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
   const me = meSnap.val();
+  const identity = identitySnap.exists() ? identitySnap.val() : {};
 
   const trimmed = ((req.body && req.body.text) || '').trim();
   if (!trimmed) return res.status(400).json({ ok: false, error: '제보 내용을 입력하세요.' });
@@ -112,8 +116,8 @@ async function report(req, res) {
 
   await db.ref('bugReports').push({
     fromKey:   userKey,
-    studentId: me.studentId || null,
-    realName:  me.realName || null,
+    studentId: identity.studentId || null,
+    realName:  identity.realName || null,
     nickname:  me.nickname || userKey,
     text:      trimmed,
     at:        Date.now(),

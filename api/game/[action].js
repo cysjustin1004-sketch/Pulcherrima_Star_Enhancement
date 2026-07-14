@@ -31,6 +31,15 @@ async function enhance(req, res) {
       return undefined;
     }
 
+    // 직전 강화 실패가 아직 해결(방지권 사용 or 0강 하락) 안 됐으면 새 강화를 막는다.
+    // 이게 없으면 실패 후 방지권 선택 모달을 띄운 채로 탭을 닫았다가 Ctrl+Shift+T로
+    // 복원해 다시 강화를 누르는 식으로 — currentStar가 실패 시점 그대로 남아있는 걸
+    // 악용해 페널티(단계 하락/방지권 소모) 없이 무한 재시도할 수 있었다.
+    if (user.pendingFailure) {
+      outcome = { error: '이전 강화 실패를 먼저 처리하세요.', status: 409 };
+      return undefined;
+    }
+
     const level = user.currentStar || 0;
     const track = user.track || null;
     const stage = resolveStage(level, track);
@@ -159,8 +168,13 @@ async function protection(req, res) {
 
   if (!pf) return res.status(400).json({ ok: false, error: '처리할 강화 실패가 없습니다.' });
   if (Date.now() - pf.timestamp > 5 * 60 * 1000) {
-    await db.ref(`users/${userKey}/pendingFailure`).remove();
-    return res.status(400).json({ ok: false, error: '시간이 초과되었습니다.' });
+    // 방치해도 페널티가 면제되면 안 되므로, 미사용(포기)과 동일하게 0강으로 처리한다.
+    await db.ref().update({
+      [`users/${userKey}/currentStar`]: 0,
+      [`users/${userKey}/pendingFailure`]: null,
+      [`users/${userKey}/enhanceDestroys`]: (user.enhanceDestroys || 0) + 1,
+    });
+    return res.status(400).json({ ok: false, error: '시간이 초과되어 0강으로 초기화되었습니다.' });
   }
 
   const { useProtection } = req.body;

@@ -14,8 +14,10 @@
 <div class="page" id="list-view">
   <h1 class="page-title">💬 메시지</h1>
 
+  <button class="bug-report-btn" id="btn-bug-report">버그 제보하기</button>
+
   <div class="add-friend-box">
-    <input type="text" id="friend-search-input" placeholder="닉네임으로 친구 검색">
+    <input type="text" id="friend-search-input" placeholder="학번으로 친구 검색">
     <button class="btn-primary" id="btn-friend-search" style="width:auto;">검색</button>
   </div>
   <div id="search-results"></div>
@@ -40,7 +42,7 @@
 <div id="chat-view" style="display:none;">
   <div class="chat-header">
     <button class="chat-back" id="btn-chat-back">←</button>
-    <div class="chat-header-name" id="chat-header-name" style="cursor:pointer;">닉네임</div>
+    <div class="chat-header-name" id="chat-header-name" style="cursor:pointer;">학번 이름</div>
     <button class="btn-secondary" id="btn-chat-profile" style="width:auto; margin-left:auto;">프로필</button>
   </div>
   <div class="chat-messages" id="chat-messages"></div>
@@ -83,6 +85,17 @@
       <div class="profile-stat-label">배틀</div>
       <div class="profile-stat-value" id="profile-battle-text"></div>
     </div>
+  </div>
+</div>
+
+<!-- ───────────────── 버그 제보 모달 ───────────────── -->
+<div class="codex-modal-bg" id="bug-modal-bg">
+  <div class="codex-modal">
+    <div class="codex-modal-name">버그 제보</div>
+    <div class="codex-modal-sub">발견한 버그나 문제를 자세히 적어주세요.</div>
+    <textarea id="bug-report-text" maxlength="1000" placeholder="어떤 상황에서 무슨 문제가 있었는지 적어주세요." style="width:100%; min-height:120px; margin-top:0.75rem; padding:0.7rem; font-family:inherit; font-size:0.9rem; border:var(--border-w) solid var(--border); border-radius:8px; resize:vertical; box-sizing:border-box;"></textarea>
+    <button class="btn-primary mt-1" id="btn-bug-send">보내기</button>
+    <button class="btn-secondary w-100 mt-05" id="bug-modal-close">닫기</button>
   </div>
 </div>
 
@@ -403,6 +416,35 @@ document.getElementById('btn-chat-profile').addEventListener('click', () => {
 
 document.getElementById('profile-modal-close').addEventListener('click', () => {
   document.getElementById('profile-modal-bg').classList.remove('visible');
+});
+
+// ─── 버그 제보 ───────────────────────────────────────
+
+document.getElementById('btn-bug-report').addEventListener('click', () => {
+  document.getElementById('bug-report-text').value = '';
+  document.getElementById('bug-modal-bg').classList.add('visible');
+});
+
+document.getElementById('bug-modal-close').addEventListener('click', () => {
+  document.getElementById('bug-modal-bg').classList.remove('visible');
+});
+
+document.getElementById('btn-bug-send').addEventListener('click', async () => {
+  const textEl = document.getElementById('bug-report-text');
+  const text = textEl.value.trim();
+  if (!text) { showToast('제보 내용을 입력하세요.'); return; }
+
+  const btn = document.getElementById('btn-bug-send');
+  btn.disabled = true;
+  const res = await apiCall('/api/messages/report', { text });
+  btn.disabled = false;
+
+  if (res.ok) {
+    showToast('제보 감사합니다!');
+    document.getElementById('bug-modal-bg').classList.remove('visible');
+  } else {
+    showToast(res.error || '제보 전송 실패');
+  }
 });
 
 // ─── 토스트 ─────────────────────────────────────────

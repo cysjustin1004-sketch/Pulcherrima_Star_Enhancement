@@ -98,7 +98,31 @@ async function send(req, res) {
   res.json({ ok: true, message: { from: userKey, text: trimmed, at } });
 }
 
-const ROUTES = { conversations, history, send };
+async function report(req, res) {
+  const userKey = await validateSession(req);
+  if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  const meSnap = await db.ref(`users/${userKey}`).get();
+  if (!meSnap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+  const me = meSnap.val();
+
+  const trimmed = ((req.body && req.body.text) || '').trim();
+  if (!trimmed) return res.status(400).json({ ok: false, error: '제보 내용을 입력하세요.' });
+  if (trimmed.length > 1000) return res.status(400).json({ ok: false, error: '제보 내용은 1000자 이하여야 합니다.' });
+
+  await db.ref('bugReports').push({
+    fromKey:   userKey,
+    studentId: me.studentId || null,
+    realName:  me.realName || null,
+    nickname:  me.nickname || userKey,
+    text:      trimmed,
+    at:        Date.now(),
+  });
+
+  res.json({ ok: true });
+}
+
+const ROUTES = { conversations, history, send, report };
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();

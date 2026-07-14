@@ -664,6 +664,17 @@ input::placeholder { color: #9a9a9a; }
 }
 .form-error.visible { display: block; }
 
+.form-check-row { margin: 0.6rem 0; }
+.form-check-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-sub);
+  cursor: pointer;
+}
+.form-check-label input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; }
+
 /* ─── 랭킹 ─── */
 
 .rank-list { display: flex; flex-direction: column; gap: 0.6rem; }
@@ -1232,6 +1243,20 @@ input::placeholder { color: #9a9a9a; }
 .friend-preview { font-size: 0.78rem; color: var(--text-sub); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .friend-meta { font-size: 0.7rem; color: var(--text-sub); text-align: right; flex-shrink: 0; }
 .friend-record { font-size: 0.75rem; color: var(--text-sub); margin-top: 2px; }
+
+.bug-report-btn {
+  display: block;
+  margin: 0 0 0.75rem auto;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-sub);
+  background: var(--bg2);
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.bug-report-btn:active { transform: translate(1px, 1px); }
 
 .add-friend-box {
   display: flex;

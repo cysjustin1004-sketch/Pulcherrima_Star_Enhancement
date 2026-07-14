@@ -65,7 +65,7 @@
 
     <!-- 유저 목록 -->
     <div class="card">
-      <div class="card-title">전체 유저 목록</div>
+      <div class="card-title">전체 유저 목록 <span id="user-count-label" style="color:var(--text-sub); font-weight:normal;"></span></div>
       <div class="form-group">
         <input type="text" id="user-search" placeholder="닉네임 또는 학번으로 검색">
       </div>
@@ -284,6 +284,8 @@ async function loadUsers() {
     .map(([key, data]) => ({ key, ...data }))
     .sort((a, b) => (b.bestStar || 0) - (a.bestStar || 0));
 
+  document.getElementById('user-count-label').textContent = `(${allUsers.length}명)`;
+
   applyUserSearch();
 }
 
@@ -315,10 +317,14 @@ function renderUserList(users) {
     row.className = 'admin-user-row';
     const isBanned = !!user.banned;
     const identity = allIdentities[user.key] || {};
+    // userIdentities 마이그레이션 전(또는 그 이전 가입) 계정은 학번·이름이 아직
+    // users/{key}에 남아있으므로, 비공개 노드에 없으면 공개 유저 데이터로 폴백한다.
+    const studentId = identity.studentId || user.studentId || null;
+    const realName = identity.realName || user.realName || null;
     row.innerHTML = `
       <div class="admin-user-info">
         <div class="admin-user-nick">${escapeHtml(user.nickname || user.key)}${isBanned ? ' <span style="color:var(--danger);font-size:0.75rem;">[벤]</span>' : ''}${user.isCheat ? ' <span style="color:var(--blue);font-size:0.75rem;">[치트]</span>' : ''}</div>
-        <div class="admin-user-stat">학번 ${escapeHtml(identity.studentId || '-')}${identity.realName ? ' (' + escapeHtml(identity.realName) + ')' : ''}</div>
+        <div class="admin-user-stat">학번 ${escapeHtml(studentId || '-')}${realName ? ' (' + escapeHtml(realName) + ')' : ''}</div>
         <div class="admin-user-stat">📧 ${escapeHtml(emails[user.key] || '(미등록)')}</div>
         <div class="admin-user-stat">
           💧 ${formatNumber(user.hydrogen || 0)} · ⭐ +${user.currentStar || 0} · 최고 +${user.bestStar || 0} · 방지권 ${user.protectionScrolls || 0}

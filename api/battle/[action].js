@@ -27,17 +27,22 @@ async function preview(req, res) {
   if (!opponentKey) return res.status(400).json({ ok: false, error: '상대를 지정하세요.' });
   if (opponentKey === userKey) return res.status(400).json({ ok: false, error: '자기 자신과는 배틀할 수 없습니다.' });
 
-  const meSnap = await db.ref(`users/${userKey}`).get();
+  // 서로 의존관계 없는 조회 4개를 한 번에 병렬로 (기존엔 순차 await 4번)
+  const [meSnap, friendSnap, oppSnap, counterSnap] = await Promise.all([
+    db.ref(`users/${userKey}`).get(),
+    db.ref(`friends/${userKey}/${opponentKey}`).get(),
+    db.ref(`users/${opponentKey}`).get(),
+    db.ref(`battleCounters/${userKey}/${opponentKey}/${todayUTCBucket()}`).get(),
+  ]);
+
   if (!meSnap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
   const me = meSnap.val();
   if (me.banned) return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
 
-  const friendSnap = await db.ref(`friends/${userKey}/${opponentKey}`).get();
   if (!friendSnap.exists()) {
     return res.status(403).json({ ok: false, error: '친구만 배틀할 수 있습니다.' });
   }
 
-  const oppSnap = await db.ref(`users/${opponentKey}`).get();
   if (!oppSnap.exists()) return res.status(404).json({ ok: false, error: '상대를 찾을 수 없습니다.' });
   const opp = oppSnap.val();
   if (opp.banned) return res.status(403).json({ ok: false, error: '정지된 사용자입니다.' });
@@ -47,7 +52,6 @@ async function preview(req, res) {
 
   const winProb = battleWinProb(myBattle.level, oppBattle.level);
 
-  const counterSnap = await db.ref(`battleCounters/${userKey}/${opponentKey}/${todayUTCBucket()}`).get();
   const usedToday = counterSnap.exists() ? counterSnap.val() : 0;
   const remainingToday = Math.max(0, BATTLE_DAILY_CAP - usedToday);
 
@@ -82,16 +86,20 @@ async function execute(req, res) {
   if (!opponentKey) return res.status(400).json({ ok: false, error: '상대를 지정하세요.' });
   if (opponentKey === userKey) return res.status(400).json({ ok: false, error: '자기 자신과는 배틀할 수 없습니다.' });
 
-  const meSnap = await db.ref(`users/${userKey}`).get();
+  // 서로 의존관계 없는 조회 3개를 한 번에 병렬로 (기존엔 순차 await 3번)
+  const [meSnap, friendSnap, oppSnap] = await Promise.all([
+    db.ref(`users/${userKey}`).get(),
+    db.ref(`friends/${userKey}/${opponentKey}`).get(),
+    db.ref(`users/${opponentKey}`).get(),
+  ]);
+
   if (!meSnap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
   if (meSnap.val().banned) return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
 
-  const friendSnap = await db.ref(`friends/${userKey}/${opponentKey}`).get();
   if (!friendSnap.exists()) {
     return res.status(403).json({ ok: false, error: '친구만 배틀할 수 있습니다.' });
   }
 
-  const oppSnap = await db.ref(`users/${opponentKey}`).get();
   if (!oppSnap.exists()) return res.status(404).json({ ok: false, error: '상대를 찾을 수 없습니다.' });
   if (oppSnap.val().banned) return res.status(403).json({ ok: false, error: '정지된 사용자입니다.' });
 
@@ -106,13 +114,10 @@ async function execute(req, res) {
     return res.status(429).json({ ok: false, error: '오늘 이 상대와의 배틀 횟수를 모두 사용했습니다.' });
   }
 
-  // ── 최신 상태 재조회 ──
-  const [meSnap2, oppSnap2] = await Promise.all([
-    db.ref(`users/${userKey}`).get(),
-    db.ref(`users/${opponentKey}`).get(),
-  ]);
-  const me  = meSnap2.val();
-  const opp = oppSnap2.val();
+  // 트랜잭션은 battleCounters 경로만 건드리므로, 위에서 이미 읽은 유저 데이터를
+  // 다시 읽지 않고 그대로 재사용한다(불필요한 read 2회 절감).
+  const me  = meSnap.val();
+  const opp = oppSnap.val();
 
   const myBattle  = battleStarOf(me);
   const oppBattle = battleStarOf(opp);
@@ -214,14 +219,43 @@ async function profile(req, res) {
     db.ref(`friendRequests/${userKey}/${opponentKey}`).get(), // 상대가 나에게 보낸 요청
   ]);
 
+  // 프로필 사진 — 유저가 도감에서 직접 골라둔 별이 있으면 그걸, 없으면 현재 강화 중인
+  // 별을 기본값으로 쓴다. 여러 명이 동시에 강화하는 상황에서 사진이 계속 바뀌는 걸
+  // 막기 위해 currentStar와는 별개로 고정된 사진을 보여주기 위함.
+  let picLevel = opp.currentStar || 0;
+  let picTrack = opp.track || null;
+  if (opp.profilePicKey) {
+    const picStage = parseStageKey(opp.profilePicKey);
+    if (resolveStage(picStage.level, picStage.track)) {
+      picLevel = picStage.level;
+      picTrack = picStage.track;
+    }
+  }
+
+  // bestTrack이 도입되기 전(커밋 7e8a90f 이전)에 이미 14~21강을 찍은 레거시 계정은
+  // bestTrack이 비어 있어 resolveStage(bestStar, null)이 실패 → 클라이언트가
+  // COMMON_STAGES[0](거대 분자운)으로 잘못 대체 표시하는 문제가 있었다. 트랙은
+  // 13→14강 전환 때만 바뀌므로, 현재 track을 최선의 추정치로 채워 넣는다.
+  let bestTrack = opp.bestTrack || null;
+  if (!bestTrack && opp.bestStar >= 14 && opp.bestStar <= 21) {
+    bestTrack = opp.track || null;
+  }
+
   res.json({
     ok: true,
     nickname: opp.nickname,
+    studentId: opp.studentId || null,
+    realName: opp.realName || null,
     currentStar: opp.currentStar || 0,
     track: opp.track || null,
+    picLevel,
+    picTrack,
     bestStar: opp.bestStar || 0,
+    bestTrack,
     battleWins: opp.battleWins || 0,
     battleLosses: opp.battleLosses || 0,
+    enhanceAttempts: opp.enhanceAttempts || 0,
+    enhanceDestroys: opp.enhanceDestroys || 0,
     isFriend: friendSnap.exists(),
     hasPendingRequest: pendingOutSnap.exists() || pendingInSnap.exists(),
   });

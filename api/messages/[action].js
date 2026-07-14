@@ -68,17 +68,19 @@ async function send(req, res) {
   const userKey = await validateSession(req);
   if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
 
-  const meSnap = await db.ref(`users/${userKey}`).get();
-  if (!meSnap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
-  if (meSnap.val().banned) return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
-
   const { toKey, text } = req.body;
   const trimmed = (text || '').trim();
   if (!toKey) return res.status(400).json({ ok: false, error: '대상을 지정하세요.' });
   if (!trimmed) return res.status(400).json({ ok: false, error: '메시지를 입력하세요.' });
   if (trimmed.length > 500) return res.status(400).json({ ok: false, error: '메시지는 500자 이하여야 합니다.' });
 
-  const friendSnap = await db.ref(`friends/${userKey}/${toKey}`).get();
+  // 서로 의존관계 없는 조회를 병렬로 (기존엔 순차 await 2번)
+  const [meSnap, friendSnap] = await Promise.all([
+    db.ref(`users/${userKey}`).get(),
+    db.ref(`friends/${userKey}/${toKey}`).get(),
+  ]);
+  if (!meSnap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+  if (meSnap.val().banned) return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
   if (!friendSnap.exists()) {
     return res.status(403).json({ ok: false, error: '친구만 메시지를 보낼 수 있습니다.' });
   }
@@ -111,7 +113,7 @@ async function report(req, res) {
   await db.ref('bugReports').push({
     fromKey:   userKey,
     studentId: me.studentId || null,
-    name:      me.name || null,
+    realName:  me.realName || null,
     nickname:  me.nickname || userKey,
     text:      trimmed,
     at:        Date.now(),

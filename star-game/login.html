@@ -29,11 +29,11 @@
       <div id="form-login">
         <div class="form-group">
           <label class="form-label">학번</label>
-          <input type="text" id="login-studentid" placeholder="학번 입력" maxlength="12" inputmode="numeric" autocomplete="username">
+          <input type="text" id="login-studentid" placeholder="예: 1305 (선생님/외부인은 0000)" maxlength="4" inputmode="numeric" autocomplete="username">
         </div>
         <div class="form-group">
           <label class="form-label">이름</label>
-          <input type="text" id="login-name" placeholder="이름 입력" maxlength="10">
+          <input type="text" id="login-name" placeholder="이름 입력" maxlength="20">
         </div>
         <div class="form-group">
           <label class="form-label">비밀번호</label>
@@ -52,12 +52,12 @@
       <!-- 회원가입 폼 -->
       <div id="form-register" style="display:none">
         <div class="form-group">
-          <label class="form-label">학번</label>
-          <input type="text" id="reg-studentid" placeholder="학번 입력" maxlength="12" inputmode="numeric" autocomplete="username">
+          <label class="form-label">학번 (4자리, 선생님/외부인은 0000)</label>
+          <input type="text" id="reg-studentid" placeholder="예: 1305 (1학년 3반 5번)" maxlength="4" inputmode="numeric" autocomplete="username">
         </div>
         <div class="form-group">
           <label class="form-label">이름</label>
-          <input type="text" id="reg-name" placeholder="이름 입력" maxlength="10">
+          <input type="text" id="reg-name" placeholder="실명 입력" maxlength="20">
         </div>
         <div class="form-group">
           <label class="form-label">비밀번호 (4자 이상)</label>
@@ -88,7 +88,7 @@
       const remembered = getRememberedLogin();
       if (remembered) {
         document.getElementById('login-studentid').value = remembered.studentId;
-        document.getElementById('login-name').value = remembered.name;
+        document.getElementById('login-name').value = remembered.realName;
         document.getElementById('remember-login').checked = true;
         document.getElementById('login-password').focus();
       }
@@ -122,17 +122,17 @@
       btn.textContent = '로그인 중...';
 
       const studentId = document.getElementById('login-studentid').value;
-      const name      = document.getElementById('login-name').value;
+      const realName  = document.getElementById('login-name').value;
 
       const result = await login(
         studentId,
-        name,
+        realName,
         document.getElementById('login-password').value
       );
 
       if (result.ok) {
         if (document.getElementById('remember-login').checked) {
-          saveRememberedLogin({ studentId: studentId.trim(), name: name.trim() });
+          saveRememberedLogin({ studentId: studentId.trim(), realName: realName.trim() });
         } else {
           clearRememberedLogin();
         }

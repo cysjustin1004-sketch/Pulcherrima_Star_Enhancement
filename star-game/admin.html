@@ -87,7 +87,7 @@
     <div class="card" style="border-color:var(--danger);">
       <div class="card-title" style="color:var(--danger);">위험 구역 — 전체 유저 데이터 초기화</div>
       <div style="font-size:0.82rem; color:var(--text-sub); margin-bottom:0.75rem;">
-        공통 17단계 + 5트랙 분기 구조(v2)로 게임을 개편하면서 옛 구조로 저장된 유저/로그/비밀번호 데이터를 모두 삭제합니다. 되돌릴 수 없습니다.
+        유저·로그인 정보·강화 로그·친구·친구요청·대화·배틀 기록/카운터·학번 등록 내역을 전부 삭제합니다(관리자 계정 자체는 유지). 되돌릴 수 없습니다.
       </div>
       <button class="btn-danger" id="btn-wipe-users" style="width:100%;">전체 유저 데이터 삭제</button>
     </div>
@@ -256,15 +256,17 @@ async function loadUsers() {
           💧 ${formatNumber(user.hydrogen || 0)} · ⭐ +${user.currentStar || 0} · 최고 +${user.bestStar || 0} · 방지권 ${user.protectionScrolls || 0}
         </div>
       </div>
-      <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+      <div style="display:flex;gap:0.4rem;flex-shrink:0;flex-wrap:wrap;">
         <button class="btn-outline" style="font-size:0.78rem; padding:0.4rem 0.7rem;">로그</button>
         <button class="${isBanned ? 'btn-secondary' : 'btn-danger'}" style="font-size:0.78rem; padding:0.4rem 0.7rem;">${isBanned ? '벤 해제' : '벤'}</button>
+        <button class="btn-danger" style="font-size:0.78rem; padding:0.4rem 0.7rem;">삭제</button>
       </div>
     `;
 
-    const [btnLog, btnBan] = row.querySelectorAll('button');
+    const [btnLog, btnBan, btnDelete] = row.querySelectorAll('button');
     btnLog.addEventListener('click', () => viewLogs(user.key, user.nickname || user.key));
     btnBan.addEventListener('click', () => toggleBan(user.key, user.nickname || user.key, isBanned));
+    btnDelete.addEventListener('click', () => deleteUser(user.key, user.nickname || user.key));
 
     userList.appendChild(row);
   });
@@ -369,11 +371,38 @@ async function toggleBan(userKey, nickname, currentlyBanned) {
   }
 }
 
+// ─── 계정 삭제 (벤과 달리 되돌릴 수 없음) ────────────
+
+async function deleteUser(userKey, nickname) {
+  const input = prompt(`${nickname} 님 계정을 완전히 삭제합니다. 되돌릴 수 없습니다.\n계속하려면 닉네임을 정확히 입력하세요: ${nickname}`);
+  if (input !== nickname) {
+    if (input !== null) showToast('닉네임이 일치하지 않아 취소되었습니다.');
+    return;
+  }
+
+  const res = await fetch('/api/admin/delete-user', {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'X-Admin-Token': adminToken || '',
+    },
+    body: JSON.stringify({ userKey, confirm: nickname }),
+  });
+  const data = await res.json();
+
+  if (data.ok) {
+    showToast(`${nickname} 계정이 삭제되었습니다.`);
+    await loadUsers();
+  } else {
+    showToast(data.error || '삭제 실패');
+  }
+}
+
 // ─── 치트 계정 생성 (QA/도감 확인용) ─────────────────
 
 document.getElementById('btn-create-cheat').addEventListener('click', async () => {
   const studentId = document.getElementById('cheat-studentid').value.trim() || '9999';
-  const name      = document.getElementById('cheat-name').value.trim() || 'cheat';
+  const realName  = document.getElementById('cheat-name').value.trim() || 'cheat';
   const password  = document.getElementById('cheat-password').value.trim() || 'cheat1234';
 
   const res = await fetch('/api/admin/create-cheat-account', {
@@ -382,7 +411,7 @@ document.getElementById('btn-create-cheat').addEventListener('click', async () =
       'Content-Type':  'application/json',
       'X-Admin-Token': adminToken || '',
     },
-    body: JSON.stringify({ studentId, name, password }),
+    body: JSON.stringify({ studentId, realName, password }),
   });
   const data = await res.json();
 

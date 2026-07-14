@@ -100,18 +100,6 @@ function formatOutputDesc(output) {
   return '?';
 }
 
-// 아이템 종류별 대표 아이콘 (그림 리소스가 없어 문자로 대체)
-const ITEM_ICONS = {
-  [ITEM_KEYS.STELLAR_WIND]:    'W',
-  [ITEM_KEYS.HYPERGIANT_CORE]: 'C',
-  [ITEM_KEYS.SUPERNOVA_GLOW]:  'G',
-  [ITEM_KEYS.NEUTRON_CRUST]:   'N',
-  [ITEM_KEYS.PULSAR_SIGNAL]:   'P',
-  [ITEM_KEYS.MAGNETAR_FLARE]:  'M',
-  [ITEM_KEYS.HAWKING]:         'H',
-  [ITEM_KEYS.DARK_MATTER]:     'D',
-};
-
 function renderAll(user) {
   currentUser = user;
 
@@ -121,17 +109,13 @@ function renderAll(user) {
   let heldCount = 0;
   Object.entries(ITEM_NAMES).forEach(([key, name]) => {
     const count = (user.items && user.items[key]) || 0;
-    const warning = IMPORTANT_ITEM_WARNINGS[key] || '';
     if (count > 0) heldCount++;
 
     const slot = document.createElement('div');
-    slot.className = 'item-slot' + (count === 0 ? ' empty' : '') + (warning && count > 0 ? ' warn' : '');
-    if (warning && count > 0) slot.title = warning;
+    slot.className = 'item-slot' + (count === 0 ? ' empty' : '');
     slot.innerHTML = `
-      <div class="item-slot-icon">${ITEM_ICONS[key] || '?'}</div>
       <div class="item-slot-name">${name}</div>
       <div class="item-slot-count">${count}개</div>
-      ${warning && count > 0 ? '<div class="item-slot-warn">!</div>' : ''}
     `;
     invList.appendChild(slot);
   });
@@ -142,7 +126,9 @@ function renderAll(user) {
   const starList = document.getElementById('stored-stars-list');
   starList.innerHTML = '';
   const stored = user.storedStars || {};
-  const storedEntries = Object.entries(stored).filter(([, cnt]) => cnt > 0);
+  const storedEntries = Object.entries(stored)
+    .filter(([, cnt]) => cnt > 0)
+    .sort(([keyA], [keyB]) => parseStageKey(keyB).level - parseStageKey(keyA).level);
   const totalStoredCount = storedEntries.reduce((sum, [, cnt]) => sum + cnt, 0);
   document.getElementById('stored-stars-count').textContent = `${totalStoredCount} / ${INVENTORY_CAP}`;
 
@@ -152,7 +138,11 @@ function renderAll(user) {
     storedEntries.forEach(([key, cnt]) => {
       const { level, track } = parseStageKey(key);
       const stage = resolveStage(level, track);
-      const usage = starMaterialUsage(level, track);
+      // 재료 소모는 트랙 무관 풀링(sumStoredStarAcrossTracks)이라, 이 별이 실제로
+      // 소모될 곳은 이 별 "자신의" 트랙이 아니라 내 계정이 실제로 밟고 있는
+      // currentUser.track의 상위 강화 단계다 — 별의 트랙(track)을 넘기면
+      // 크래프팅/이전 워프로 다른 트랙 별을 보관 중일 때 엉뚱한 안내가 뜬다.
+      const usage = starMaterialUsage(level, currentUser.track);
       const canSell = stage && stage.sellPrice;
       const slot = document.createElement('div');
       slot.className = 'item-slot' + (usage.length ? ' material' : '');
@@ -160,6 +150,7 @@ function renderAll(user) {
         <div class="item-slot-badge">+${level}</div>
         <img class="item-slot-img" src="${starImagePath(level, track)}" alt="">
         <div class="item-slot-name">${stage ? stage.name : '?'}</div>
+        ${track ? `<div class="item-slot-track">(${TRACK_INFO[track].name})</div>` : ''}
         <div class="item-slot-count">${cnt}개</div>
         ${usage.length ? `<div class="material-usage-note">${usage[0]} 재료</div>` : ''}
         <div class="item-slot-actions" style="display:flex; flex-direction:column; gap:0.25rem; margin-top:0.4rem; width:100%;">

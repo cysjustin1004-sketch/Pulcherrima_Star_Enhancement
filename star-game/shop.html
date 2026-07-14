@@ -122,7 +122,11 @@ async function handleBuy(item) {
   const data = await res.json();
 
   if (data.ok) {
-    showToast(`${item.name} 구매 완료!`);
+    if (item.type === 'warp') {
+      showToast(data.warpSuccess ? `성공! ${item.name} 발동!` : '실패... 수소만 소모되고 단계는 그대로입니다.');
+    } else {
+      showToast(`${item.name} 구매 완료!`);
+    }
     await reload();
   } else {
     showToast(data.error || '구매 실패');

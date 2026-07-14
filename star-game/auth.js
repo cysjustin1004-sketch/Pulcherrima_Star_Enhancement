@@ -73,15 +73,15 @@ function requireAuth() {
 function getRememberedLogin() {
   try {
     const r = JSON.parse(localStorage.getItem(REMEMBER_KEY));
-    if (r && r.studentId && r.name) return r;
+    if (r && r.studentId && r.realName) return r;
     return null;
   } catch {
     return null;
   }
 }
 
-function saveRememberedLogin({ studentId, name }) {
-  localStorage.setItem(REMEMBER_KEY, JSON.stringify({ studentId, name }));
+function saveRememberedLogin({ studentId, realName }) {
+  localStorage.setItem(REMEMBER_KEY, JSON.stringify({ studentId, realName }));
 }
 
 function clearRememberedLogin() {
@@ -90,19 +90,22 @@ function clearRememberedLogin() {
 
 // ─── 회원가입 ───────────────────────────────────────────────
 
+// 학번 4자리: [학년(1~3)][반(1~5)][번호(01~21)]. 선생님/외부인은 예외적으로 "0000"을 쓴다.
+const STUDENT_ID_PATTERN = /^[1-3][1-5](0[1-9]|1[0-9]|2[01])$/;
+
 /**
  * 회원가입 — /api/auth/register 호출
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
-async function register(studentId, name, password) {
-  const sid = (studentId || '').trim();
-  const nm  = (name || '').trim();
+async function register(studentId, realName, password) {
+  const sid  = (studentId || '').trim();
+  const name = (realName || '').trim();
 
-  if (!sid || sid.length > 12) {
-    return { ok: false, error: '학번을 입력하세요.' };
+  if (sid !== '0000' && !STUDENT_ID_PATTERN.test(sid)) {
+    return { ok: false, error: '학번은 학년(1~3)·반(1~5)·번호(01~21) 4자리이거나, 선생님/외부인은 0000을 입력하세요.' };
   }
-  if (!nm || nm.length > 10) {
-    return { ok: false, error: '이름을 입력하세요.' };
+  if (!name || name.length > 20) {
+    return { ok: false, error: '이름을 입력하세요(20자 이하).' };
   }
   if (!password || password.length < 4) {
     return { ok: false, error: '비밀번호는 4자 이상이어야 합니다.' };
@@ -114,7 +117,7 @@ async function register(studentId, name, password) {
     const res  = await fetch('/api/auth/register', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ studentId: sid, name: nm, passwordHash }),
+      body:    JSON.stringify({ studentId: sid, realName: name, passwordHash }),
     });
     const data = await res.json();
     if (!data.ok) return { ok: false, error: data.error || '회원가입 실패' };
@@ -132,10 +135,10 @@ async function register(studentId, name, password) {
  * 로그인 — /api/auth/login 호출
  * @returns {Promise<{ok: boolean, error?: string}>}
  */
-async function login(studentId, name, password) {
-  const sid = (studentId || '').trim();
-  const nm  = (name || '').trim();
-  if (!sid || !nm || !password) {
+async function login(studentId, realName, password) {
+  const sid  = (studentId || '').trim();
+  const name = (realName || '').trim();
+  if (!sid || !name || !password) {
     return { ok: false, error: '학번, 이름, 비밀번호를 입력하세요.' };
   }
 
@@ -145,7 +148,7 @@ async function login(studentId, name, password) {
     const res  = await fetch('/api/auth/login', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ studentId: sid, name: nm, passwordHash }),
+      body:    JSON.stringify({ studentId: sid, realName: name, passwordHash }),
     });
     const data = await res.json();
     if (!data.ok) return { ok: false, error: data.error || '로그인 실패' };

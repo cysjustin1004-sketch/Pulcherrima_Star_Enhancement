@@ -235,7 +235,14 @@ input::placeholder { color: #9a9a9a; }
   gap: 0.6rem;
 }
 
-.top-header-logout {
+.top-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.top-header-logout,
+.top-header-profile-btn {
   background: none;
   border: none;
   box-shadow: none;
@@ -246,7 +253,8 @@ input::placeholder { color: #9a9a9a; }
   padding: 0.3rem 0.4rem;
   cursor: pointer;
 }
-.top-header-logout:hover { color: var(--text); }
+.top-header-logout:hover,
+.top-header-profile-btn:hover { color: var(--text); }
 
 .top-header-logo {
   width: 32px;
@@ -796,6 +804,67 @@ input::placeholder { color: #9a9a9a; }
 .codex-modal-nav-prev { left: -14px; }
 .codex-modal-nav-next { right: -14px; }
 .codex-modal-nav:disabled { opacity: 0.25; box-shadow: none; }
+/* 전역 button:active:not(:disabled)의 translate(4px,4px)를 그대로 두면 마우스로
+   누르는 동안 버튼이 커서 아래에서 벗어나 mouseup 시 클릭이 성립하지 않는다
+   (터치는 시작 지점 타깃을 유지해 우연히 문제없었음 — .hr-badge와 동일한 원인).
+   세로 중앙 정렬용 translateY(-50%)만 유지해서 밀림을 없앤다. */
+.codex-modal-nav:active:not(:disabled) { transform: translateY(-50%); }
+
+/* 프로필 모달 — 우측 상단 X 닫기 버튼 (부모에 position:relative 필요) */
+.modal-close-x {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg2);
+  border: 2px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  z-index: 2;
+}
+.modal-close-x svg { display: block; }
+/* 다른 모달 닫기 버튼과 동일한 이유로 세로 밀림 방지 — X는 애초에 세로 정렬용
+   transform이 없으므로 active 시 전역 translate(4px,4px)만 완전히 제거한다. */
+.modal-close-x:active:not(:disabled) { transform: none; }
+
+/* 프로필 모달 — 업적 통계 블록 (스크롤로 하나씩 내려보는 구조) */
+.profile-stat-block {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: var(--border-w) solid var(--border);
+  text-align: center;
+}
+.profile-stat-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.6rem;
+}
+.profile-stat-value {
+  font-family: 'Sora', sans-serif;
+  font-size: 1.9rem;
+  font-weight: 900;
+  color: var(--accent);
+  line-height: 1.2;
+}
+.profile-stat-img {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  margin: 0 auto 0.5rem;
+  display: block;
+}
+.profile-stat-sub {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
 
 /* 트랙 선택창 */
 .codex-track-title { font-family: 'Sora', sans-serif; font-size: 1.05rem; font-weight: 900; color: var(--text); margin-bottom: 0.3rem; }
@@ -907,9 +976,6 @@ input::placeholder { color: #9a9a9a; }
   box-shadow: none;
   opacity: 0.5;
 }
-.item-slot.warn { border-color: var(--danger); }
-
-.item-slot-icon { font-size: 1.4rem; line-height: 1; }
 .item-slot-img {
   width: 34px;
   height: 34px;
@@ -920,6 +986,12 @@ input::placeholder { color: #9a9a9a; }
   font-weight: 700;
   line-height: 1.15;
   color: var(--text);
+  word-break: keep-all;
+}
+.item-slot-track {
+  font-size: 0.56rem;
+  font-weight: 500;
+  color: var(--text-sub);
   word-break: keep-all;
 }
 .item-slot-count {
@@ -936,12 +1008,6 @@ input::placeholder { color: #9a9a9a; }
   font-size: 0.58rem;
   font-weight: 900;
   padding: 1px 4px;
-}
-.item-slot-warn {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  font-size: 0.7rem;
 }
 .inv-empty-note {
   grid-column: 1 / -1;

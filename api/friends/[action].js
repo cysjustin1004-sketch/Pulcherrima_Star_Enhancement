@@ -65,28 +65,32 @@ async function request(req, res) {
   if (!toKey) return res.status(400).json({ ok: false, error: '대상을 지정하세요.' });
   if (toKey === userKey) return res.status(400).json({ ok: false, error: '자기 자신에게는 요청할 수 없습니다.' });
 
-  const meSnap = await db.ref(`users/${userKey}`).get();
+  // 서로 의존관계 없는 조회 5개를 한 번에 병렬로 (기존엔 순차 await 5번)
+  const [meSnap, targetSnap, alreadyFriendsSnap, myPendingSnap, reverseSnap] = await Promise.all([
+    db.ref(`users/${userKey}`).get(),
+    db.ref(`users/${toKey}`).get(),
+    db.ref(`friends/${userKey}/${toKey}`).get(),
+    db.ref(`friendRequests/${toKey}/${userKey}`).get(),
+    db.ref(`friendRequests/${userKey}/${toKey}`).get(),
+  ]);
+
   if (!meSnap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
   const me = meSnap.val();
   if (me.banned) return res.status(403).json({ ok: false, error: '정지된 계정입니다.' });
 
-  const targetSnap = await db.ref(`users/${toKey}`).get();
   if (!targetSnap.exists()) return res.status(404).json({ ok: false, error: '존재하지 않는 사용자입니다.' });
   const target = targetSnap.val();
   if (target.banned) return res.status(403).json({ ok: false, error: '정지된 사용자입니다.' });
 
-  const alreadyFriendsSnap = await db.ref(`friends/${userKey}/${toKey}`).get();
   if (alreadyFriendsSnap.exists()) {
     return res.status(409).json({ ok: false, error: '이미 친구입니다.' });
   }
 
-  const myPendingSnap = await db.ref(`friendRequests/${toKey}/${userKey}`).get();
   if (myPendingSnap.exists()) {
     return res.status(409).json({ ok: false, error: '이미 친구 요청을 보냈습니다.' });
   }
 
   // 상대가 이미 나에게 요청을 보낸 상태 → 자동 수락
-  const reverseSnap = await db.ref(`friendRequests/${userKey}/${toKey}`).get();
   if (reverseSnap.exists()) {
     const now = Date.now();
     await db.ref().update({
@@ -115,12 +119,11 @@ async function respond(req, res) {
     return res.status(400).json({ ok: false, error: '잘못된 요청입니다.' });
   }
 
-  const reqSnap = await db.ref(`friendRequests/${userKey}/${fromKey}`).get();
-  if (!reqSnap.exists()) {
-    return res.status(404).json({ ok: false, error: '해당 친구 요청을 찾을 수 없습니다.' });
-  }
-
   if (action === 'reject') {
+    const reqSnap = await db.ref(`friendRequests/${userKey}/${fromKey}`).get();
+    if (!reqSnap.exists()) {
+      return res.status(404).json({ ok: false, error: '해당 친구 요청을 찾을 수 없습니다.' });
+    }
     await db.ref().update({
       [`friendRequests/${userKey}/${fromKey}`]:     null,
       [`friendRequestsSent/${fromKey}/${userKey}`]: null,
@@ -128,10 +131,16 @@ async function respond(req, res) {
     return res.json({ ok: true });
   }
 
-  const [meSnap, fromSnap] = await Promise.all([
+  // action이 이미 확정돼 있으므로(accept), 이번에 필요한 조회 3개를 한 번에 병렬로
+  // (기존엔 reqSnap 확인 후 meSnap/fromSnap을 따로 조회해 왕복이 2번이었음)
+  const [reqSnap, meSnap, fromSnap] = await Promise.all([
+    db.ref(`friendRequests/${userKey}/${fromKey}`).get(),
     db.ref(`users/${userKey}`).get(),
     db.ref(`users/${fromKey}`).get(),
   ]);
+  if (!reqSnap.exists()) {
+    return res.status(404).json({ ok: false, error: '해당 친구 요청을 찾을 수 없습니다.' });
+  }
   if (!meSnap.exists() || !fromSnap.exists()) {
     return res.status(404).json({ ok: false, error: '유저 없음' });
   }

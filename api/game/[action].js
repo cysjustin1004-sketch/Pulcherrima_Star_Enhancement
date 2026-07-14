@@ -1,12 +1,18 @@
 const db = require('../../lib/firebase-admin');
 const { validateSession } = require('../../lib/session');
-const { resolveStage, stageKey, parseStageKey, ITEM_NAMES, TRACK_INFO, INVENTORY_CAP } = require('../../lib/game-config');
+const { resolveStage, stageKey, parseStageKey, ITEM_NAMES, TRACK_INFO, INVENTORY_CAP, RATE_LIMIT } = require('../../lib/game-config');
+const { isRateLimited } = require('../../lib/rate-limit');
 
 const TRACK_KEYS = Object.keys(TRACK_INFO);
 
 async function enhance(req, res) {
   const userKey = await validateSession(req);
   if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  // DB를 건드리기 전에 먼저 차단 — 매크로/스크립트가 남용해도 Firebase 부하로 이어지지 않는다
+  if (isRateLimited(userKey, RATE_LIMIT.maxPerMinute)) {
+    return res.status(429).json({ ok: false, error: '너무 빠른 요청입니다. 잠시 후 다시 시도하세요.' });
+  }
 
   const snap = await db.ref(`users/${userKey}`).get();
   if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저를 찾을 수 없습니다.' });
@@ -32,8 +38,12 @@ async function enhance(req, res) {
     if (held < cost.amount)
       return res.status(400).json({ ok: false, error: `${ITEM_NAMES[cost.key]}이(가) ${cost.amount}개 필요합니다.` });
   } else if (cost.type === 'star') {
-    // 트랙 무관하게 인정 — 트랙이 매번 랜덤 배정되므로 어느 트랙에서 보관했든 레벨만 맞으면 재료로 인정
-    const stored = TRACK_KEYS.reduce((sum, t) => sum + ((user.storedStars && user.storedStars[`${t}_${cost.level}`]) || 0), 0);
+    // 트랙 무관하게 인정 — 트랙이 매번 랜덤 배정되므로 어느 트랙에서 보관했든 레벨만 맞으면 재료로 인정.
+    // stageKey는 공통(0~13)·우주루트(22강 이상) 별을 트랙 접두어 없는 순수 레벨 키("22")로
+    // 저장하므로, track1_22 등 접두어 키만 더하면 그 구간 별은 항상 0으로 잡혀 보유 중이어도
+    // 재료 부족으로 오판된다 — 접두어 없는 키도 함께 더한다.
+    const stored = TRACK_KEYS.reduce((sum, t) => sum + ((user.storedStars && user.storedStars[`${t}_${cost.level}`]) || 0), 0)
+      + ((user.storedStars && user.storedStars[String(cost.level)]) || 0);
     if (stored < cost.amount)
       return res.status(400).json({ ok: false, error: `+${cost.level}강 별이 ${cost.amount}개 필요합니다.` });
   }
@@ -44,6 +54,9 @@ async function enhance(req, res) {
   // Firebase 일괄 업데이트 구성
   const upd = {};
 
+  // 강화 시도 횟수(성공/실패 무관) — 프로필 기록용
+  upd[`users/${userKey}/enhanceAttempts`] = (user.enhanceAttempts || 0) + 1;
+
   // 비용 차감
   if (cost.type === 'hydrogen') {
     upd[`users/${userKey}/hydrogen`] = (user.hydrogen || 0) - cost.amount;
@@ -51,11 +64,11 @@ async function enhance(req, res) {
     const held = (user.items && user.items[cost.key]) || 0;
     upd[`users/${userKey}/items/${cost.key}`] = held - cost.amount;
   } else if (cost.type === 'star') {
-    // 여러 트랙에 나뉘어 보관돼 있을 수 있으므로 트랙 순서대로 필요한 만큼 차감
+    // 여러 트랙(+ 트랙 접두어 없는 우주루트 별)에 나뉘어 보관돼 있을 수 있으므로 순서대로 필요한 만큼 차감
     let remaining = cost.amount;
-    for (const t of TRACK_KEYS) {
+    const keys = [...TRACK_KEYS.map(t => `${t}_${cost.level}`), String(cost.level)];
+    for (const k of keys) {
       if (remaining <= 0) break;
-      const k = `${t}_${cost.level}`;
       const have = (user.storedStars && user.storedStars[k]) || 0;
       if (have <= 0) continue;
       const take = Math.min(have, remaining);
@@ -154,10 +167,11 @@ async function protection(req, res) {
     });
     res.json({ ok: true, currentStar: level, usedProtection: true });
   } else {
-    // 방지권 미사용 — +0으로 초기화
+    // 방지권 미사용 — +0으로 초기화 (프로필에 보여줄 "파괴 횟수" 집계)
     await db.ref().update({
       [`users/${userKey}/currentStar`]: 0,
       [`users/${userKey}/pendingFailure`]: null,
+      [`users/${userKey}/enhanceDestroys`]: (user.enhanceDestroys || 0) + 1,
     });
     res.json({ ok: true, currentStar: 0, usedProtection: false });
   }
@@ -291,7 +305,38 @@ async function load(req, res) {
   res.json({ ok: true, level: newLevel, track: newTrack, autoStored: curLevel > 0 });
 }
 
-const ROUTES = { enhance, protection, sell, store, sellStored, load };
+async function setProfilePic(req, res) {
+  const userKey = await validateSession(req);
+  if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  const { key } = req.body;
+
+  if (key == null) {
+    // 해제 — 프로필 사진을 다시 현재 강화 중인 별로 되돌림
+    await db.ref(`users/${userKey}/profilePicKey`).remove();
+    return res.json({ ok: true, profilePicKey: null });
+  }
+
+  const snap = await db.ref(`users/${userKey}`).get();
+  if (!snap.exists()) return res.status(404).json({ ok: false, error: '유저 없음' });
+
+  const user = snap.val();
+  const unlocked = user.unlockedCodex || [];
+  // 해금하지 않은 도감 항목을 프로필 사진으로 지정하지 못하도록 서버에서도 검증
+  if (!unlocked.includes(key)) {
+    return res.status(400).json({ ok: false, error: '아직 해금하지 않은 별입니다.' });
+  }
+
+  const { level, track } = parseStageKey(key);
+  if (!resolveStage(level, track)) {
+    return res.status(400).json({ ok: false, error: '유효하지 않은 별입니다.' });
+  }
+
+  await db.ref(`users/${userKey}/profilePicKey`).set(key);
+  res.json({ ok: true, profilePicKey: key });
+}
+
+const ROUTES = { enhance, protection, sell, store, sellStored, load, setProfilePic };
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();

@@ -135,7 +135,7 @@ async function verifyEmailCode(email, code) {
 /**
  * 회원가입 1단계 — /api/auth/register-request 호출. 학번 0000(선생님/외부인)이면
  * 코인 결제 없이 바로 계정이 만들어져 세션까지 저장하고 끝난다. 그 외 학번은
- * 사다코인 500 결제 요청만 생성되고, 학생이 사다코인 화면에서 승인해야
+ * 사다코인 900 결제 요청만 생성되고, 학생이 사다코인 화면에서 승인해야
  * completeRegistration()으로 이어서 계정이 만들어진다.
  * @returns {Promise<{ok:true, done:true} | {ok:true, done:false, requestId, expiresAt} | {ok:false, error}>}
  */

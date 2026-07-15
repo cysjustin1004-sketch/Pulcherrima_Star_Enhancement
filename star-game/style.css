@@ -1010,6 +1010,12 @@ input::placeholder { color: #9a9a9a; }
   box-shadow: var(--shadow-sm);
   padding: 1rem;
   margin-bottom: 0.6rem;
+}
+
+/* shop.html의 상점 카드는 제목/설명/가격 줄 아래 버튼이 오는 세로 블록 구조라
+   display:flex를 주면 좁은 화면에서 텍스트 칸이 버튼에 밀려 한 글자씩 줄바꿈된다.
+   recipe-item(아이콘+정보+버튼 가로 배치용)만 flex를 유지한다. */
+.recipe-item {
   display: flex;
   align-items: center;
   gap: 1rem;

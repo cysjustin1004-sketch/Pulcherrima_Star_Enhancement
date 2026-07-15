@@ -60,34 +60,6 @@
   </div>
 </div>
 
-<!-- ───────────────── 사다코인 수소 충전 / 특별상품 모달 ───────────────── -->
-<div class="codex-modal-bg" id="coin-shop-modal-bg">
-  <div class="codex-modal" style="position:relative;">
-    <button class="modal-close-x" id="coin-shop-modal-close" aria-label="닫기">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 5L19 19M19 5L5 19" stroke="black" stroke-width="2.5" stroke-linecap="round"/></svg>
-    </button>
-
-    <!-- 상품 목록 화면 -->
-    <div id="coin-shop-list-view">
-      <div class="codex-modal-name">수소 충전</div>
-      <div class="codex-modal-sub">사다코인으로 수소를 충전하거나 특별상품을 구매합니다.</div>
-      <div id="coin-shop-list"></div>
-    </div>
-
-    <!-- 결제 승인 대기 화면 -->
-    <div id="coin-shop-wait-view" style="display:none;">
-      <div class="codex-modal-name">결제 승인 대기</div>
-      <div style="font-size:0.9rem; color:var(--text); margin:0.75rem 0 0.6rem;" id="coin-shop-wait-title"></div>
-      <div style="font-size:0.85rem; color:var(--text-sub); margin-bottom:1rem;">
-        휴대폰 또는 PC에서 <b>사다코인(coin.sada.ai.kr)</b>에 로그인하면 뜨는 승인 창에서
-        결제를 승인해주세요. 남은 시간: <span id="coin-shop-wait-timer">120</span>초
-      </div>
-      <div class="form-error" id="coin-shop-wait-error"></div>
-      <button class="btn-secondary" id="btn-coin-shop-wait-cancel" style="width:100%;">취소하고 목록으로</button>
-    </div>
-  </div>
-</div>
-
 <!-- ───────────────── 페이즈 진입 시네마틱 오버레이 ───────────────── -->
 <div class="phase-overlay" id="phase-overlay">
   <div class="phase-inner">
@@ -201,9 +173,6 @@
 
     <!-- 별 보관 버튼 (보관 가능한 별에서만 표시) -->
     <button class="btn-outline" id="btn-store" style="display:none;">📦 별 보관하기</button>
-
-    <!-- 사다코인 수소 충전 / 특별상품 구매 -->
-    <button class="btn-outline" id="btn-coin-shop">💧 수소 충전하기</button>
 
     <!-- 액션 행: 0강=인벤토리+상점 / 1강+=인벤토리+판매하기 -->
     <div class="action-row">
@@ -620,144 +589,6 @@ document.getElementById('profile-modal-close').addEventListener('click', () => {
   document.getElementById('profile-modal-bg').classList.remove('visible');
 });
 
-// ─── 사다코인 수소 충전 / 특별상품 ───────────────────
-// 회원가입 결제(login.html)와 동일한 요청→폴링→확정 3단계 패턴이지만, 여기는 이미
-// 로그인된 상태에서 apiCall()(세션 토큰 포함)로 호출한다는 점만 다르다.
-
-let coinShopWaitInterval = null; // 남은 시간 카운트다운
-let coinShopPollInterval = null; // 결제 상태 폴링
-
-function stopCoinShopWait() {
-  if (coinShopWaitInterval) { clearInterval(coinShopWaitInterval); coinShopWaitInterval = null; }
-  if (coinShopPollInterval) { clearInterval(coinShopPollInterval); coinShopPollInterval = null; }
-}
-
-function renderCoinShop() {
-  const list = document.getElementById('coin-shop-list');
-  list.innerHTML = '';
-
-  let specialHeaderAdded = false;
-  COIN_SHOP_ITEMS.forEach(item => {
-    if (item.special && !specialHeaderAdded) {
-      const header = document.createElement('div');
-      header.textContent = '특별상품';
-      header.style.cssText = 'font-size:0.78rem; font-weight:900; color:var(--text-sub); text-transform:uppercase; letter-spacing:0.07em; margin:1rem 0 0.5rem;';
-      list.appendChild(header);
-      specialHeaderAdded = true;
-    }
-
-    const card = document.createElement('div');
-    card.className = 'card shop-item';
-    card.innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
-        <div>
-          <div style="font-weight:700; margin-bottom:0.3rem;">${item.name}</div>
-          <div style="font-size:0.83rem; color:var(--text-sub);">${item.desc}</div>
-        </div>
-        <div style="text-align:right; flex-shrink:0;">
-          <div style="font-size:0.9rem; font-weight:700; color:var(--accent); white-space:nowrap;">
-            ${formatNumber(item.coinPrice)} 사다코인
-          </div>
-        </div>
-      </div>
-      <button class="btn-blue" style="width:100%; margin-top:0.75rem;">구매하기</button>
-    `;
-    card.querySelector('button').addEventListener('click', () => handleCoinShopBuy(item));
-    list.appendChild(card);
-  });
-}
-
-async function handleCoinShopBuy(item) {
-  if (item.type === 'star' && currentUser && (currentUser.currentStar || 0) >= item.targetLevel) {
-    showToast('이미 그 단계 이상입니다.');
-    return;
-  }
-
-  const res = await apiCall('/api/shop/coin-buy-request', { itemId: item.id });
-  if (!res.ok) {
-    showToast(res.error || '구매 요청 실패');
-    return;
-  }
-
-  waitForCoinShopApproval(item, res.requestId, res.expiresAt);
-}
-
-function showCoinShopListView() {
-  stopCoinShopWait();
-  document.getElementById('coin-shop-wait-view').style.display = 'none';
-  document.getElementById('coin-shop-list-view').style.display = '';
-}
-
-function waitForCoinShopApproval(item, requestId, expiresAt) {
-  document.getElementById('coin-shop-list-view').style.display = 'none';
-  const waitView = document.getElementById('coin-shop-wait-view');
-  waitView.style.display = '';
-
-  document.getElementById('coin-shop-wait-title').textContent =
-    `${item.name} — ${formatNumber(item.coinPrice)} 사다코인 결제 요청을 보냈습니다.`;
-  const timerEl = document.getElementById('coin-shop-wait-timer');
-  const errEl = document.getElementById('coin-shop-wait-error');
-  errEl.classList.remove('visible');
-
-  const deadline = expiresAt ? new Date(expiresAt).getTime() : Date.now() + 120000;
-
-  function tick() {
-    const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-    timerEl.textContent = remaining;
-    if (remaining <= 0) {
-      stopCoinShopWait();
-      errEl.textContent = '시간이 초과되었습니다. 목록에서 다시 시도해주세요.';
-      errEl.classList.add('visible');
-    }
-  }
-  tick();
-  coinShopWaitInterval = setInterval(tick, 1000);
-
-  async function poll() {
-    const status = await apiCall('/api/shop/coin-buy-status', { requestId });
-    if (!status.ok) return; // 일시적 조회 오류 — 다음 폴링에서 재시도
-
-    if (status.status === 'approved') {
-      stopCoinShopWait();
-      const result = await apiCall('/api/shop/coin-buy-confirm', { requestId });
-      if (result.ok) {
-        showToast(`${item.name} 구매 완료!`);
-        await reload();
-        showCoinShopListView();
-      } else {
-        errEl.textContent = result.error || '지급 처리에 실패했습니다.';
-        errEl.classList.add('visible');
-      }
-      return;
-    }
-    if (status.status === 'rejected' || status.status === 'expired' || status.status === 'canceled') {
-      stopCoinShopWait();
-      const map = {
-        rejected: '결제가 거부되었습니다.',
-        expired:  '결제 요청이 만료되었습니다. 목록에서 다시 시도해주세요.',
-        canceled: '결제 요청이 취소되었습니다.',
-      };
-      errEl.textContent = map[status.status] || '결제가 완료되지 않았습니다.';
-      errEl.classList.add('visible');
-    }
-    // pending이면 계속 대기
-  }
-  poll();
-  coinShopPollInterval = setInterval(poll, 2000);
-}
-
-document.getElementById('btn-coin-shop-wait-cancel').addEventListener('click', showCoinShopListView);
-
-document.getElementById('btn-coin-shop').addEventListener('click', () => {
-  showCoinShopListView();
-  renderCoinShop();
-  document.getElementById('coin-shop-modal-bg').classList.add('visible');
-});
-document.getElementById('coin-shop-modal-close').addEventListener('click', () => {
-  stopCoinShopWait();
-  document.getElementById('coin-shop-modal-bg').classList.remove('visible');
-});
-
 // ─── 로그아웃 ──────────────────────────────────────
 
 document.getElementById('btn-logout').addEventListener('click', (e) => {
@@ -770,10 +601,10 @@ document.getElementById('btn-logout').addEventListener('click', (e) => {
 
 // ─── 토스트 알림 ────────────────────────────────────
 
-function showToast(msg) {
+function showToast(msg, extraClass) {
   // style.css에 .toast 정의 있음 — 동적 생성
   const t = document.createElement('div');
-  t.className = 'toast';
+  t.className = 'toast' + (extraClass ? ' ' + extraClass : '');
   t.textContent = msg;
   document.body.appendChild(t);
   // 강제 reflow 후 show
@@ -919,9 +750,27 @@ async function reload() {
   updateUI(user);
 }
 
-// ─── 배틀 결과 알림 (방어자로서 놓친 결과를 홈 진입 시 순차 토스트로 표시) ───
+// ─── 배틀 결과 알림 (방어자로서 놓친 결과를 화면 위쪽 팝업으로 표시) ───
+// 패배(수소 피탈취)는 특히 눈에 띄어야 해서 주황 배경+빨간 굵은 글씨로, 화면
+// 상단에 팝업처럼 띄운다(기존엔 하단의 회색 토스트라 바텀내비에 묻혀 잘 안 보였음).
+// 페이지에 머무는 동안에도 놓치지 않도록, 최초 1회뿐 아니라 일정 간격으로 계속
+// 폴링한다 — Firebase 클라이언트 실시간 리스너는 battleLogs가 서버 전용
+// 비공개 노드(firebase-rules.json)라 못 쓰고, 서버 API를 주기적으로 확인하는
+// 방식으로 "거의 실시간"을 구현한다.
+
+let _battleNotifyRunning = false; // 폴링 간격보다 표시 시간이 길어져 겹치는 것 방지
 
 async function showBattleNotifications() {
+  if (_battleNotifyRunning) return;
+  _battleNotifyRunning = true;
+  try {
+    await showBattleNotificationsOnce();
+  } finally {
+    _battleNotifyRunning = false;
+  }
+}
+
+async function showBattleNotificationsOnce() {
   const res = await apiCall('/api/battle/notifications', {});
   if (!res.ok || !res.items || !res.items.length) return;
 
@@ -930,10 +779,12 @@ async function showBattleNotifications() {
     const msg = win
       ? `${n.opponentNick}님과의 배틀에서 승리! 수소 +${formatNumber(n.hydrogenDelta)}`
       : `${n.opponentNick}님에게 배틀에서 패배… 수소 -${formatNumber(-n.hydrogenDelta)}`;
-    showToast(msg);
+    showToast(msg, win ? 'toast-top toast-battle-win' : 'toast-top toast-battle-loss');
     await new Promise(r => setTimeout(r, 2400)); // 토스트가 겹치지 않게 순차 표시
   }
 }
+
+const BATTLE_NOTIFY_POLL_MS = 10000; // 홈 화면에 머무는 동안 배틀 결과를 확인하는 간격
 
 // ─── 초기 로드 ──────────────────────────────────────
 
@@ -956,6 +807,7 @@ async function showBattleNotifications() {
   }
 
   showBattleNotifications(); // 강화 흐름을 막지 않도록 결과를 기다리지 않음
+  setInterval(showBattleNotifications, BATTLE_NOTIFY_POLL_MS);
 })();
 </script>
 </body>

@@ -74,36 +74,6 @@
       ".write": false
     },
 
-    "registrationLocks": {
-      ".read": false,
-      ".write": false
-    },
-
-    "pendingRegistrations": {
-      ".read": false,
-      ".write": false
-    },
-
-    "coinPayments": {
-      ".read": false,
-      ".write": false
-    },
-
-    "coinRefundNeeded": {
-      ".read": false,
-      ".write": false
-    },
-
-    "pendingCoinPurchases": {
-      ".read": false,
-      ".write": false
-    },
-
-    "coinShopPayments": {
-      ".read": false,
-      ".write": false
-    },
-
     "config": {
       ".read": false,
       ".write": false

@@ -41,7 +41,9 @@
       <img class="star-img" id="profile-star-img" src="" alt="">
     </div>
     <div id="profile-battle-note" style="text-align:center; font-size:0.82rem; color:var(--text-sub); display:none;">친구만 배틀할 수 있습니다.</div>
-    <button class="btn-primary mt-1" id="btn-goto-battle">⚔ 배틀하러 가기</button>
+    <button class="btn-primary mt-1" id="btn-goto-battle" style="display:none;">⚔ 배틀하러 가기</button>
+    <button class="btn-blue mt-1" id="btn-send-friend-request" style="display:none;">🧑‍🤝‍🧑 친구 요청 보내기</button>
+    <button class="btn-outline mt-1" id="btn-request-pending" style="display:none;" disabled>요청 대기 중</button>
 
     <div class="profile-stat-block">
       <div class="profile-stat-label">강화 최고 단계</div>
@@ -204,15 +206,37 @@ async function openRankProfile(userKey) {
   document.getElementById('profile-destroys-text').textContent = `${res.enhanceDestroys}회`;
   document.getElementById('profile-battle-text').textContent = `${res.battleWins + res.battleLosses}전 ${res.battleWins}승`;
 
-  const goBtn = document.getElementById('btn-goto-battle');
-  const note  = document.getElementById('profile-battle-note');
+  const goBtn      = document.getElementById('btn-goto-battle');
+  const note       = document.getElementById('profile-battle-note');
+  const reqBtn     = document.getElementById('btn-send-friend-request');
+  const pendingBtn = document.getElementById('btn-request-pending');
+
+  // 배틀하러 가기 / 친구 요청 보내기 / 요청 대기 중 — 상태에 따라 하나만 노출
+  goBtn.style.display  = 'none';
+  note.style.display   = 'none';
+  reqBtn.style.display = 'none';
+  pendingBtn.style.display = 'none';
+
   if (res.isFriend) {
     goBtn.style.display = '';
-    note.style.display  = 'none';
     goBtn.onclick = () => { location.href = `battle.html?with=${encodeURIComponent(userKey)}`; };
+  } else if (res.hasPendingRequest) {
+    note.style.display = '';
+    pendingBtn.style.display = '';
   } else {
-    goBtn.style.display = 'none';
-    note.style.display  = '';
+    note.style.display = '';
+    reqBtn.style.display = '';
+    reqBtn.onclick = async () => {
+      reqBtn.disabled = true;
+      const r = await apiCall('/api/friends/request', { toKey: userKey });
+      if (r.ok) {
+        showToast(r.autoAccepted ? '서로 친구 요청이 있어 바로 친구가 되었습니다!' : '친구 요청을 보냈습니다.');
+        await openRankProfile(userKey); // 모달은 유지한 채 버튼 상태만 갱신
+      } else {
+        showToast(r.error || '요청 실패');
+        reqBtn.disabled = false;
+      }
+    };
   }
 
   document.getElementById('profile-modal-bg').classList.add('visible');

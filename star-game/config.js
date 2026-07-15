@@ -537,6 +537,61 @@ const SHOP_ITEMS = [
 ];
 
 // ============================================================
+// 사다코인(외부 결제) 상점 — 수소 충전 / 특별상품(+19강·+21강 즉시 지급).
+// id·type·amount·targetLevel·coinPrice·name은 lib/game-config.js와 반드시 동일해야
+// 한다(과금·지급의 실제 근거는 서버 쪽이고, 여기는 모달 표시(desc/special)에만 쓴다).
+// ============================================================
+const COIN_SHOP_ITEMS = [
+  {
+    id: 'hydrogen_1m',
+    name: '수소 100만',
+    desc: '수소 100만을 즉시 충전합니다.',
+    coinPrice: 250,
+    type: 'hydrogen',
+    amount: 1000000,
+    targetLevel: null,
+  },
+  {
+    id: 'hydrogen_5m',
+    name: '수소 500만',
+    desc: '수소 500만을 즉시 충전합니다.',
+    coinPrice: 1000,
+    type: 'hydrogen',
+    amount: 5000000,
+    targetLevel: null,
+  },
+  {
+    id: 'hydrogen_10m',
+    name: '수소 1000만',
+    desc: '수소 1000만을 즉시 충전합니다.',
+    coinPrice: 1500,
+    type: 'hydrogen',
+    amount: 10000000,
+    targetLevel: null,
+  },
+  {
+    id: 'star_19',
+    name: '+19강 별',
+    desc: '헬륨 백색왜성 등(+19강) 상태를 결제 즉시 지급합니다. 트랙은 무작위로 배정됩니다.',
+    coinPrice: 2000,
+    type: 'star',
+    amount: null,
+    targetLevel: 19,
+    special: true,
+  },
+  {
+    id: 'star_21',
+    name: '+21강 별',
+    desc: '트랙 최종 단계(+21강)를 결제 즉시 지급합니다. 트랙은 무작위로 배정됩니다.',
+    coinPrice: 2500,
+    type: 'star',
+    amount: null,
+    targetLevel: 21,
+    special: true,
+  },
+];
+
+// ============================================================
 // 조합소 레시피 (하드 모드)
 //
 // output.type === 'star'에서 level이 있으면 공통 구간(트랙 무관) 절대

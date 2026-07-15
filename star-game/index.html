@@ -601,10 +601,10 @@ document.getElementById('btn-logout').addEventListener('click', (e) => {
 
 // ─── 토스트 알림 ────────────────────────────────────
 
-function showToast(msg) {
+function showToast(msg, extraClass) {
   // style.css에 .toast 정의 있음 — 동적 생성
   const t = document.createElement('div');
-  t.className = 'toast';
+  t.className = 'toast' + (extraClass ? ' ' + extraClass : '');
   t.textContent = msg;
   document.body.appendChild(t);
   // 강제 reflow 후 show
@@ -750,9 +750,27 @@ async function reload() {
   updateUI(user);
 }
 
-// ─── 배틀 결과 알림 (방어자로서 놓친 결과를 홈 진입 시 순차 토스트로 표시) ───
+// ─── 배틀 결과 알림 (방어자로서 놓친 결과를 화면 위쪽 팝업으로 표시) ───
+// 패배(수소 피탈취)는 특히 눈에 띄어야 해서 주황 배경+빨간 굵은 글씨로, 화면
+// 상단에 팝업처럼 띄운다(기존엔 하단의 회색 토스트라 바텀내비에 묻혀 잘 안 보였음).
+// 페이지에 머무는 동안에도 놓치지 않도록, 최초 1회뿐 아니라 일정 간격으로 계속
+// 폴링한다 — Firebase 클라이언트 실시간 리스너는 battleLogs가 서버 전용
+// 비공개 노드(firebase-rules.json)라 못 쓰고, 서버 API를 주기적으로 확인하는
+// 방식으로 "거의 실시간"을 구현한다.
+
+let _battleNotifyRunning = false; // 폴링 간격보다 표시 시간이 길어져 겹치는 것 방지
 
 async function showBattleNotifications() {
+  if (_battleNotifyRunning) return;
+  _battleNotifyRunning = true;
+  try {
+    await showBattleNotificationsOnce();
+  } finally {
+    _battleNotifyRunning = false;
+  }
+}
+
+async function showBattleNotificationsOnce() {
   const res = await apiCall('/api/battle/notifications', {});
   if (!res.ok || !res.items || !res.items.length) return;
 
@@ -761,10 +779,12 @@ async function showBattleNotifications() {
     const msg = win
       ? `${n.opponentNick}님과의 배틀에서 승리! 수소 +${formatNumber(n.hydrogenDelta)}`
       : `${n.opponentNick}님에게 배틀에서 패배… 수소 -${formatNumber(-n.hydrogenDelta)}`;
-    showToast(msg);
+    showToast(msg, win ? 'toast-top toast-battle-win' : 'toast-top toast-battle-loss');
     await new Promise(r => setTimeout(r, 2400)); // 토스트가 겹치지 않게 순차 표시
   }
 }
+
+const BATTLE_NOTIFY_POLL_MS = 10000; // 홈 화면에 머무는 동안 배틀 결과를 확인하는 간격
 
 // ─── 초기 로드 ──────────────────────────────────────
 
@@ -787,6 +807,7 @@ async function showBattleNotifications() {
   }
 
   showBattleNotifications(); // 강화 흐름을 막지 않도록 결과를 기다리지 않음
+  setInterval(showBattleNotifications, BATTLE_NOTIFY_POLL_MS);
 })();
 </script>
 </body>

@@ -94,6 +94,16 @@
       ".write": false
     },
 
+    "pendingCoinPurchases": {
+      ".read": false,
+      ".write": false
+    },
+
+    "coinShopPayments": {
+      ".read": false,
+      ".write": false
+    },
+
     "config": {
       ".read": false,
       ".write": false

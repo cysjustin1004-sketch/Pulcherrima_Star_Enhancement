@@ -133,10 +133,13 @@ async function verifyEmailCode(email, code) {
 }
 
 /**
- * 회원가입 — /api/auth/register 호출
- * @returns {Promise<{ok: boolean, error?: string}>}
+ * 회원가입 1단계 — /api/auth/register-request 호출. 학번 0000(선생님/외부인)이면
+ * 코인 결제 없이 바로 계정이 만들어져 세션까지 저장하고 끝난다. 그 외 학번은
+ * 사다코인 500 결제 요청만 생성되고, 학생이 사다코인 화면에서 승인해야
+ * completeRegistration()으로 이어서 계정이 만들어진다.
+ * @returns {Promise<{ok:true, done:true} | {ok:true, done:false, requestId, expiresAt} | {ok:false, error}>}
  */
-async function register(nickname, studentId, realName, password, email) {
+async function requestRegistration(nickname, studentId, realName, password, email) {
   const nick = nickname.trim();
   const sid  = studentId.trim();
   const name = realName.trim();
@@ -161,13 +164,63 @@ async function register(nickname, studentId, realName, password, email) {
   const passwordHash = await sha256(password);
 
   try {
-    const res  = await fetch('/api/auth/register', {
+    const res  = await fetch('/api/auth/register-request', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ nickname: nick, studentId: sid, realName: name, email: mail, passwordHash }),
     });
     const data = await res.json();
     if (!data.ok) return { ok: false, error: data.error || '회원가입 실패' };
+
+    if (data.needsApproval) {
+      return {
+        ok: true, done: false,
+        requestId: data.requestId, confirmToken: data.confirmToken, expiresAt: data.expiresAt,
+      };
+    }
+    setSession(data.token, data.userKey, data.nickname);
+    return { ok: true, done: true };
+  } catch (e) {
+    return { ok: false, error: '서버 연결 오류' };
+  }
+}
+
+/**
+ * 회원가입 상태 폴링 — /api/auth/register-status 호출. 사다코인 결제 승인 대기 중
+ * 클라이언트가 주기적으로 호출해 상태(pending/approved/rejected/expired/canceled)를 확인한다.
+ * @returns {Promise<{ok: boolean, status?: string, error?: string}>}
+ */
+async function pollRegistrationStatus(requestId) {
+  try {
+    const res  = await fetch('/api/auth/register-status', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ requestId }),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || '상태 조회 실패' };
+    return { ok: true, status: data.status };
+  } catch (e) {
+    return { ok: false, error: '서버 연결 오류' };
+  }
+}
+
+/**
+ * 회원가입 2단계(확정) — /api/auth/register 호출. 사다코인 결제가 approved일 때만
+ * 서버가 계정을 만든다. 재시도해도 계정이 중복 생성되지 않는다(서버가 멱등 처리).
+ * confirmToken은 requestRegistration() 응답으로 받은 값을 그대로 넘겨야 한다
+ * (requestId만으로는 추측될 수 있어 이 토큰까지 일치해야 서버가 확정을 진행한다).
+ * @returns {Promise<{ok: boolean, error?: string, status?: string}>}
+ */
+async function completeRegistration(requestId, confirmToken) {
+  try {
+    const res  = await fetch('/api/auth/register', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ requestId, confirmToken }),
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || '회원가입 실패', status: data.status };
 
     setSession(data.token, data.userKey, data.nickname);
     return { ok: true };

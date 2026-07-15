@@ -84,6 +84,19 @@
         <div class="form-error" id="reg-error"></div>
         <button class="btn-primary mt-1" id="btn-register">회원가입</button>
       </div>
+
+      <!-- 사다코인 결제 승인 대기 화면 -->
+      <div id="form-coin-wait" style="display:none">
+        <div style="font-size:0.9rem; color:var(--text); margin-bottom:0.6rem;">
+          가입비 500 사다코인 결제 요청을 보냈습니다.
+        </div>
+        <div style="font-size:0.85rem; color:var(--text-sub); margin-bottom:1rem;">
+          휴대폰 또는 PC에서 <b>사다코인(coin.sada.ai.kr)</b>에 로그인하면 뜨는 승인 창에서
+          결제를 승인해주세요. 남은 시간: <span id="coin-wait-timer">120</span>초
+        </div>
+        <div class="form-error" id="coin-wait-error"></div>
+        <button class="btn-secondary mt-1" id="btn-coin-wait-cancel">처음부터 다시 시도</button>
+      </div>
     </div>
   </div>
 
@@ -111,12 +124,15 @@
     const tabRegister = document.getElementById('tab-register');
     const formLogin   = document.getElementById('form-login');
     const formReg     = document.getElementById('form-register');
+    const formCoinWait = document.getElementById('form-coin-wait');
 
     tabLogin.addEventListener('click', () => {
       tabLogin.classList.add('active');
       tabRegister.classList.remove('active');
       formLogin.style.display = '';
       formReg.style.display = 'none';
+      formCoinWait.style.display = 'none';
+      stopCoinWait();
     });
 
     tabRegister.addEventListener('click', () => {
@@ -124,6 +140,8 @@
       tabLogin.classList.remove('active');
       formReg.style.display = '';
       formLogin.style.display = 'none';
+      formCoinWait.style.display = 'none';
+      stopCoinWait();
     });
 
     // 로그인
@@ -241,6 +259,82 @@
       }
     });
 
+    // ─── 사다코인 결제 승인 대기 ───────────────────────
+
+    let coinWaitInterval = null;   // 남은 시간 카운트다운
+    let coinPollInterval = null;   // 결제 상태 폴링
+
+    function stopCoinWait() {
+      if (coinWaitInterval) { clearInterval(coinWaitInterval); coinWaitInterval = null; }
+      if (coinPollInterval) { clearInterval(coinPollInterval); coinPollInterval = null; }
+    }
+
+    function showRegisterFormAgain() {
+      stopCoinWait();
+      formCoinWait.style.display = 'none';
+      formReg.style.display = '';
+      btnRegister.disabled = false;
+      btnRegister.textContent = '회원가입';
+    }
+
+    /** 사다코인 결제 승인 대기 화면으로 전환하고, 상태가 확정될 때까지 폴링한다. */
+    function waitForCoinApproval(requestId, confirmToken, expiresAt) {
+      formReg.style.display = 'none';
+      formCoinWait.style.display = '';
+
+      const timerEl = document.getElementById('coin-wait-timer');
+      const waitErrEl = document.getElementById('coin-wait-error');
+      waitErrEl.classList.remove('visible');
+
+      const deadline = expiresAt ? new Date(expiresAt).getTime() : Date.now() + 120000;
+
+      function tick() {
+        const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        timerEl.textContent = remaining;
+        if (remaining <= 0) {
+          stopCoinWait();
+          waitErrEl.textContent = '시간이 초과되었습니다. 처음부터 다시 시도해주세요.';
+          waitErrEl.classList.add('visible');
+        }
+      }
+      tick();
+      coinWaitInterval = setInterval(tick, 1000);
+
+      async function poll() {
+        const status = await pollRegistrationStatus(requestId);
+        if (!status.ok) {
+          // 일시적 조회 오류는 다음 폴링에서 다시 시도 — 여기서 바로 실패 처리하지 않는다.
+          return;
+        }
+        if (status.status === 'approved') {
+          stopCoinWait();
+          const result = await completeRegistration(requestId, confirmToken);
+          if (result.ok) {
+            window.location.href = 'index.html';
+          } else {
+            waitErrEl.textContent = result.error;
+            waitErrEl.classList.add('visible');
+          }
+          return;
+        }
+        if (status.status === 'rejected' || status.status === 'expired' || status.status === 'canceled') {
+          stopCoinWait();
+          const map = {
+            rejected: '결제가 거부되었습니다.',
+            expired:  '결제 요청이 만료되었습니다. 처음부터 다시 시도해주세요.',
+            canceled: '결제 요청이 취소되었습니다.',
+          };
+          waitErrEl.textContent = map[status.status] || '결제가 완료되지 않았습니다.';
+          waitErrEl.classList.add('visible');
+        }
+        // pending이면 계속 대기
+      }
+      poll();
+      coinPollInterval = setInterval(poll, 2000);
+    }
+
+    document.getElementById('btn-coin-wait-cancel').addEventListener('click', showRegisterFormAgain);
+
     // 회원가입
     btnRegister.addEventListener('click', async () => {
       const btn = btnRegister;
@@ -264,7 +358,7 @@
       btn.disabled = true;
       btn.textContent = '가입 중...';
 
-      const result = await register(
+      const result = await requestRegistration(
         document.getElementById('reg-nickname').value,
         document.getElementById('reg-student-id').value,
         document.getElementById('reg-real-name').value,
@@ -272,13 +366,18 @@
         emailInput.value
       );
 
-      if (result.ok) {
-        window.location.href = 'index.html';
-      } else {
+      if (!result.ok) {
         errEl.textContent = result.error;
         errEl.classList.add('visible');
         btn.disabled = false;
         btn.textContent = '회원가입';
+        return;
+      }
+
+      if (result.done) {
+        window.location.href = 'index.html';
+      } else {
+        waitForCoinApproval(result.requestId, result.confirmToken, result.expiresAt);
       }
     });
   </script>

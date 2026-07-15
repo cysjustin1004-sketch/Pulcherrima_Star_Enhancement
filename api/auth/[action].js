@@ -17,7 +17,7 @@ const MAX_SENDS     = 5;              // 이메일당 시간당 발송 상한
 const SEND_WINDOW   = 60 * 60 * 1000; // 발송 상한 집계 윈도우 1시간
 const VERIFY_WINDOW = 30 * 60 * 1000; // 인증 완료 후 register가 유효하다고 인정하는 시간
 
-const SADA_SIGNUP_FEE   = 500;              // 가입 시 사다코인 징수액
+const SADA_SIGNUP_FEE   = 900;              // 가입 시 사다코인 징수액
 const REGISTER_LOCK_TTL = 3 * 60 * 1000;    // 동일 닉네임 중복 결제요청 방지 창
 
 async function login(req, res) {
@@ -221,7 +221,7 @@ async function finalizeRegistration({ userKey, nick, sid, name, mail, emailVerif
 
 /**
  * 회원가입 1단계 — 입력 검증 + 유일성 확인 후, 학번 0000(선생님/외부인)이면 사다코인
- * 결제 없이 바로 계정을 만들고, 그 외에는 사다코인 500 결제 요청만 생성한다(계정은
+ * 결제 없이 바로 계정을 만들고, 그 외에는 사다코인 900 결제 요청만 생성한다(계정은
  * 아직 안 만듦 — 학생이 사다코인 화면에서 승인해야 register-confirm으로 넘어간다).
  */
 async function registerRequest(req, res) {

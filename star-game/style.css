@@ -986,6 +986,31 @@ input::placeholder { color: #9a9a9a; }
   color: var(--text);
 }
 
+/* 배틀 요약 모달 — 자리를 비운 사이 당한 배틀을 상대별로 집계해 보여주는 목록 */
+.battle-summary-row {
+  padding: 0.7rem 0;
+  border-top: var(--border-w) solid var(--border);
+}
+.battle-summary-row:first-child { border-top: none; }
+.battle-summary-nick {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+.battle-summary-detail { font-size: 0.85rem; color: var(--text-sub); }
+.battle-summary-win  { color: var(--success); font-weight: 700; }
+.battle-summary-loss { color: var(--danger);  font-weight: 700; }
+.battle-summary-total {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: var(--border-w) solid var(--border);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text);
+  text-align: center;
+}
+
 /* 트랙 선택창 */
 .codex-track-title { font-family: 'Sora', sans-serif; font-size: 1.05rem; font-weight: 900; color: var(--text); margin-bottom: 0.3rem; }
 .codex-track-desc { font-size: 0.82rem; color: var(--text-sub); margin-bottom: 1rem; line-height: 1.5; }

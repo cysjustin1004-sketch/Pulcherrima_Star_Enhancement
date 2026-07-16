@@ -60,6 +60,18 @@
   </div>
 </div>
 
+<!-- ───────────────── 자리를 비운 사이 배틀 요약 모달 ───────────────── -->
+<!-- 오프라인 중 방어전 당한 결과를 로그인 직후 상대별로 집계해 한 번에 보여준다.
+     이후 접속 중 실시간으로 새로 당하는 배틀은 기존 개별 토스트(showToast)로 그대로 안내. -->
+<div class="codex-modal-bg" id="battle-summary-bg">
+  <div class="codex-modal" style="position:relative;">
+    <div class="codex-modal-name">자리를 비운 사이 배틀 결과</div>
+    <div id="battle-summary-list"></div>
+    <div id="battle-summary-total"></div>
+    <button class="btn-primary" id="battle-summary-ok" style="width:100%; margin-top:1.25rem;">확인</button>
+  </div>
+</div>
+
 <!-- ───────────────── 페이즈 진입 시네마틱 오버레이 ───────────────── -->
 <div class="phase-overlay" id="phase-overlay">
   <div class="phase-inner">
@@ -384,6 +396,14 @@ function showOverlay(titleText, titleClass, descText) {
 
 function hideOverlay() {
   document.getElementById('result-overlay').classList.remove('visible');
+
+  // 강화 실패(방지권 선택 등) 오버레이가 떠 있는 동안 배틀 요약이 도착했으면
+  // 표시를 미뤄뒀다가, 오버레이가 닫히는 이 시점에 이어서 띄운다.
+  if (_pendingBattleSummary) {
+    const items = _pendingBattleSummary;
+    _pendingBattleSummary = null;
+    showBattleSummary(items);
+  }
 }
 
 function showConfirmButton() {
@@ -770,9 +790,23 @@ async function showBattleNotifications() {
   }
 }
 
+// notifications는 응답을 읽는 순간 서버에서 seen 처리되어 다시 안 뜬다. 그래서
+// "로그인 후 최초 1회 응답"은 항상 자리를 비운 사이(또는 마지막 접속 이후) 쌓인
+// 백로그 전체이고, 그 이후 폴링 응답은 접속 중 새로 당한 것만 담긴다 — 이 구분을
+// 이용해 최초 1회만 상대별 집계 모달로, 이후는 기존 개별 토스트로 보여준다.
+let _battleFirstLoad = true;
+let _pendingBattleSummary = null; // 강화 실패 오버레이 때문에 못 띄운 요약 대기열(hideOverlay에서 재개)
+
 async function showBattleNotificationsOnce() {
   const res = await apiCall('/api/battle/notifications', {});
+  const firstLoad = _battleFirstLoad;
+  _battleFirstLoad = false;
   if (!res.ok || !res.items || !res.items.length) return;
+
+  if (firstLoad) {
+    showBattleSummary(res.items);
+    return;
+  }
 
   for (const n of res.items) {
     const win = n.result === 'win';
@@ -783,6 +817,68 @@ async function showBattleNotificationsOnce() {
     await new Promise(r => setTimeout(r, 2400)); // 토스트가 겹치지 않게 순차 표시
   }
 }
+
+// ─── 배틀 요약 모달 (로그인 시 밀린 배틀 결과 상대별 집계) ────────────
+
+/** 닉네임은 길이만 검증되고 문자 제한이 없어(api/auth register) innerHTML에 그대로
+ * 꽂으면 안 된다 — battle.html/admin.html 등과 동일한 이스케이프를 적용한다. */
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** opponentNick 기준으로 묶어 상대별 승/패/순증감 + 전체 합계를 구한다. */
+function aggregateBattleItems(items) {
+  const byOpponent = new Map();
+  let totalWins = 0, totalLosses = 0, totalNet = 0;
+
+  for (const it of items) {
+    const win = it.result === 'win';
+    if (win) totalWins++; else totalLosses++;
+    totalNet += it.hydrogenDelta;
+
+    const row = byOpponent.get(it.opponentNick) || { nick: it.opponentNick, count: 0, wins: 0, losses: 0, net: 0 };
+    row.count++;
+    if (win) row.wins++; else row.losses++;
+    row.net += it.hydrogenDelta;
+    byOpponent.set(it.opponentNick, row);
+  }
+
+  return { rows: [...byOpponent.values()], totalWins, totalLosses, totalNet };
+}
+
+/** 순증감(net)을 "수소 N 획득/손실" 문구로 — 획득은 성공 토스트색, 손실은 위험색과 통일 */
+function battleNetPhrase(net) {
+  const cls = net >= 0 ? 'battle-summary-win' : 'battle-summary-loss';
+  const label = net >= 0 ? '획득' : '손실';
+  return `<span class="${cls}">수소 ${formatNumber(Math.abs(net))} ${label}</span>`;
+}
+
+function showBattleSummary(items) {
+  // 강화 실패(방지권 선택 등) 오버레이가 이미 떠 있으면 겹치지 않도록 미뤘다가
+  // hideOverlay()가 닫히는 시점에 이어서 띄운다.
+  if (document.getElementById('result-overlay').classList.contains('visible')) {
+    _pendingBattleSummary = items;
+    return;
+  }
+
+  const { rows, totalWins, totalLosses, totalNet } = aggregateBattleItems(items);
+
+  document.getElementById('battle-summary-list').innerHTML = rows.map(r => `
+    <div class="battle-summary-row">
+      <div class="battle-summary-nick">${escapeHtml(r.nick)}님과 배틀 ${r.count}회</div>
+      <div class="battle-summary-detail">${r.wins}승 ${r.losses}패 · ${battleNetPhrase(r.net)}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('battle-summary-total').innerHTML =
+    `합계: ${totalWins}승 ${totalLosses}패 · ${battleNetPhrase(totalNet)}`;
+
+  document.getElementById('battle-summary-bg').classList.add('visible');
+}
+
+document.getElementById('battle-summary-ok').addEventListener('click', () => {
+  document.getElementById('battle-summary-bg').classList.remove('visible');
+});
 
 const BATTLE_NOTIFY_POLL_MS = 10000; // 홈 화면에 머무는 동안 배틀 결과를 확인하는 간격
 

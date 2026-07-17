@@ -226,6 +226,9 @@ async function sell(req, res) {
   const txResult = await atomicUpdate(`users/${userKey}`, (user) => {
     if (!user) { errorResult = { status: 404, error: '유저 없음' }; return undefined; }
     if (user.banned) { errorResult = { status: 403, error: '정지된 계정입니다.' }; return undefined; }
+    // 실패 미해결 상태(pendingFailure)면 방지권/파괴 대가 없이 현재 별을 팔아 회피할
+    // 수 있으므로, protection()으로 먼저 해결하도록 강제한다.
+    if (user.pendingFailure) { errorResult = { status: 409, error: '이전 강화 실패를 먼저 처리하세요.' }; return undefined; }
 
     const stage = resolveStage(user.currentStar || 0, user.track);
     if (!stage || !stage.sellPrice) {
@@ -253,6 +256,9 @@ async function store(req, res) {
   const txResult = await atomicUpdate(`users/${userKey}`, (user) => {
     if (!user) { errorResult = { status: 404, error: '유저 없음' }; return undefined; }
     if (user.banned) { errorResult = { status: 403, error: '정지된 계정입니다.' }; return undefined; }
+    // 실패 미해결 상태(pendingFailure)면 방지권/파괴 대가 없이 현재 별을 보관함으로
+    // 빼돌려 회피할 수 있으므로, protection()으로 먼저 해결하도록 강제한다.
+    if (user.pendingFailure) { errorResult = { status: 409, error: '이전 강화 실패를 먼저 처리하세요.' }; return undefined; }
 
     const level = user.currentStar || 0;
     if (level < 1) {
@@ -338,6 +344,10 @@ async function load(req, res) {
   const txResult = await atomicUpdate(`users/${userKey}`, (user) => {
     if (!user) { errorResult = { status: 404, error: '유저 없음' }; return undefined; }
     if (user.banned) { errorResult = { status: 403, error: '정지된 계정입니다.' }; return undefined; }
+    // 실패 미해결 상태(pendingFailure)면, load()의 "현재 별 자동 보관" 스왑 로직이
+    // 방지권/파괴 대가 없이 위험했던 별을 보관함으로 빼돌리는 우회로가 된다 —
+    // protection()으로 먼저 해결하도록 강제한다.
+    if (user.pendingFailure) { errorResult = { status: 409, error: '이전 강화 실패를 먼저 처리하세요.' }; return undefined; }
 
     const storedStars = { ...(user.storedStars || {}) };
     const have = storedStars[key] || 0;

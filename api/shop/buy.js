@@ -36,6 +36,13 @@ async function buy(req, res) {
       outcome = { error: '현재 단계보다 낮은 도약권은 사용할 수 없습니다.', status: 400 };
       return undefined;
     }
+    // 실패 미해결 상태(pendingFailure)에서 도약권이 성공하면 currentStar가 그냥
+    // 덮어써져서, 방지권/파괴 대가 없이 위험했던 별의 실패가 통째로 사라진다 —
+    // protection()으로 먼저 해결하도록 강제한다(방지권 구매 자체는 막을 이유가 없어 warp만 차단).
+    if (item.type === 'warp' && user.pendingFailure) {
+      outcome = { error: '이전 강화 실패를 먼저 처리하세요.', status: 409 };
+      return undefined;
+    }
 
     // 충돌 시 최신 데이터로 재호출될 수 있으므로, 매번 user를 얕은 복제해
     // 다음 상태(next)를 구성한다 — 이전 호출의 잔여 상태가 섞이지 않는다.

@@ -104,7 +104,8 @@ async function request(req, res) {
 
   const createdAt = Date.now();
   await db.ref().update({
-    [`friendRequests/${toKey}/${userKey}`]:     { fromNickname: me.nickname, createdAt },
+    // seen:false — 전역 알림 폴러(notifications)가 아직 안 띄운 새 요청만 골라내는 데 사용.
+    [`friendRequests/${toKey}/${userKey}`]:     { fromNickname: me.nickname, createdAt, seen: false },
     [`friendRequestsSent/${userKey}/${toKey}`]: { toNickname: target.nickname, createdAt },
   });
 
@@ -213,7 +214,32 @@ async function search(req, res) {
   });
 }
 
-const ROUTES = { list, request, respond, search, cancel };
+// 새 친구 요청 알림 — 전역 폴러(star-game/notify.js) 전용. battle/notifications,
+// messages/notifications와 동일한 "조회 → 선별 → 그 자리에서 소비(seen 갱신) → 응답" 패턴.
+// 이 필드 추가 전에 이미 와있던 pending 요청은 seen이 없어(undefined) 알림이 안 뜨지만,
+// "받은 친구 요청" 목록(friends/list)엔 그대로 남아있으므로 안전한 기본값이다.
+async function notifications(req, res) {
+  const userKey = await validateSession(req);
+  if (!userKey) return res.status(401).json({ ok: false, error: '로그인이 필요합니다.' });
+
+  const snap = await db.ref(`friendRequests/${userKey}`).get();
+  const raw = snap.exists() ? snap.val() : {};
+
+  const items = [];
+  const upd = {};
+  for (const [fromKey, entry] of Object.entries(raw)) {
+    if (entry && entry.seen === false) {
+      items.push({ fromKey, fromNickname: entry.fromNickname, createdAt: entry.createdAt });
+      upd[`friendRequests/${userKey}/${fromKey}/seen`] = true; // 읽음 처리(소비)
+    }
+  }
+  if (Object.keys(upd).length) await db.ref().update(upd);
+
+  items.sort((a, b) => a.createdAt - b.createdAt);
+  res.json({ ok: true, items });
+}
+
+const ROUTES = { list, request, respond, search, cancel, notifications };
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).end();

@@ -240,9 +240,61 @@ async function register(req, res) {
   res.json({ ok: true, token, userKey, nickname: nick });
 }
 
+// 발표/데모용 게스트 계정 — 비밀번호·이메일·학번 없이 즉시 발급된다.
+// authSecrets/userEmails/emailIndex를 쓰지 않으므로 이 계정은 login으로 재접속할 수 없다
+// (세션 토큰이 남아있는 동안에만 이어서 사용 가능).
+async function guest(req, res) {
+  const ip = req.headers['x-forwarded-for'] || (req.socket && req.socket.remoteAddress) || 'unknown';
+  if (isRateLimited(`guest:${ip}`, 5)) {
+    return res.status(429).json({ ok: false, error: '잠시 후 다시 시도해주세요.' });
+  }
+
+  // 닉네임 충돌 시 자리수를 늘려가며 재시도 — userKey가 닉네임에서 파생되므로 중복은 안 된다.
+  let nick, userKey, exists = true;
+  let attempts = 0;
+  while (exists) {
+    attempts++;
+    const digits = attempts <= 8 ? 4 : 5;
+    const max = 10 ** digits;
+    const num = crypto.randomInt(0, max).toString().padStart(digits, '0');
+    nick = `게스트${num}`;
+    userKey = nicknameToKey(nick);
+    const snap = await db.ref(`users/${userKey}`).get();
+    exists = snap.exists();
+  }
+
+  const now = Date.now();
+  const upd = {
+    [`userIdentities/${userKey}`]: { studentId: '0000', realName: nick },
+    [`users/${userKey}`]: {
+      nickname: nick,
+      hydrogen: STARTING_HYDROGEN,
+      currentStar: 0,
+      bestStar: 0,
+      protectionScrolls: 0,
+      battleWins: 0,
+      battleLosses: 0,
+      unlockedCodex: ['0'],
+      items: {
+        stellar_wind: 0, hypergiant_core: 0, supernova_glow: 0,
+        neutron_crust: 0, pulsar_signal: 0, magnetar_flare: 0,
+        hawking_radiation: 0, dark_matter: 0,
+      },
+      storedStars: {},
+      isGuest: true,
+      createdAt: now,
+    },
+  };
+  await db.ref().update(upd);
+
+  const token = await createSession(userKey);
+  res.json({ ok: true, token, userKey, nickname: nick });
+}
+
 const ROUTES = {
   login,
   register,
+  guest,
   'send-email-code': sendEmailCode,
   'verify-email-code': verifyEmailCode,
 };

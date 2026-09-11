@@ -94,8 +94,10 @@
   <script src="firebase.js"></script>
   <script src="auth.js"></script>
   <script>
-    // 이미 로그인된 경우 메인으로 이동
-    if (getSession()) window.location.href = 'index.html';
+    // 이미 로그인된 경우 메인으로 이동 — 단, ?legacy=1로 직접 들어온 경우는
+    // 게스트 세션을 덮어쓰고 기존 계정으로 로그인할 수 있도록 바운스를 건너뛴다.
+    const isLegacyEntry = new URLSearchParams(location.search).get('legacy') === '1';
+    if (getSession() && !isLegacyEntry) window.location.href = 'index.html';
 
     // 기억된 닉네임 자동 채움 (비밀번호는 저장하지 않음)
     (() => {

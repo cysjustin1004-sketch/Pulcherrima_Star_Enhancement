@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>별 강화하기 — 시작하기</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&family=Sora:wght@700;900&family=Hanken+Grotesk:wght@400;500;700;900&family=Geist:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-box">
+      <div class="login-logo">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L14.4 9.2L22 12L14.4 14.8L12 22L9.6 14.8L2 12L9.6 9.2L12 2Z" fill="black"/>
+        </svg>
+      </div>
+      <div class="login-title">별 강화하기</div>
+      <div class="login-sub" id="start-status">계정을 준비하고 있습니다...</div>
+      <div class="form-error" id="start-error"></div>
+      <button class="btn-primary mt-1" id="btn-retry" style="display:none">다시 시도</button>
+    </div>
+  </div>
+
+  <script src="auth.js"></script>
+  <script>
+    const statusEl = document.getElementById('start-status');
+    const errEl    = document.getElementById('start-error');
+    const btnRetry = document.getElementById('btn-retry');
+
+    async function start() {
+      // 이미 세션이 있으면(게스트든 기존 로그인이든) 그대로 이어서 진행
+      if (getSession()) {
+        window.location.replace('index.html');
+        return;
+      }
+
+      statusEl.textContent = '계정을 준비하고 있습니다...';
+      errEl.classList.remove('visible');
+      btnRetry.style.display = 'none';
+
+      const result = await createGuestSession();
+      if (result.ok) {
+        window.location.replace('index.html');
+      } else {
+        statusEl.textContent = '계정을 준비하지 못했습니다.';
+        errEl.textContent = result.error;
+        errEl.classList.add('visible');
+        btnRetry.style.display = '';
+      }
+    }
+
+    btnRetry.addEventListener('click', start);
+    start();
+  </script>
+</body>
+</html>

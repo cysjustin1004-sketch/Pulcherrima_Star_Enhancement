@@ -22,7 +22,13 @@
   </div>
   <div class="top-header-actions">
     <button class="top-header-profile-btn" id="btn-my-profile">내 프로필</button>
-    <button class="top-header-logout" id="btn-logout">🚪 로그아웃</button>
+    <button class="top-header-logout" id="btn-logout">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:-2px; margin-right:0.3em;">
+        <path d="M4 12C4 7.58172 7.58172 4 12 4C15.0808 4 17.7508 5.75465 19.0651 8.32475" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M20 12C20 16.4183 16.4183 20 12 20C8.91924 20 6.24917 18.2454 4.93493 15.6753" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <path d="M19 4V8.5H14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M5 20V15.5H9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>새 계정으로 시작</button>
   </div>
 </div>
 
@@ -614,9 +620,9 @@ document.getElementById('profile-modal-close').addEventListener('click', () => {
 
 document.getElementById('btn-logout').addEventListener('click', (e) => {
   e.preventDefault();
-  if (confirm('로그아웃하시겠습니까?')) {
+  if (confirm('새 계정으로 다시 시작할까요? 지금 진행 상황은 사라집니다.')) {
     clearSession();
-    location.href = 'login.html';
+    location.href = 'start.html';
   }
 });
 
@@ -765,7 +771,7 @@ async function reload() {
   const user = await loadCurrentUser();
   if (!user) {
     clearSession();
-    location.href = 'login.html';
+    location.href = 'start.html';
     return;
   }
   updateUI(user);

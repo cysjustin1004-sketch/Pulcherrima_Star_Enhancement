@@ -247,7 +247,7 @@ async function handleLoadStored(key, stage) {
 
 async function reload() {
   const user = await loadCurrentUser();
-  if (!user) { clearSession(); location.href = 'login.html'; return; }
+  if (!user) { clearSession(); location.href = 'start.html'; return; }
   renderAll(user);
 }
 

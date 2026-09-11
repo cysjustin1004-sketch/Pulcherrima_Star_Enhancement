@@ -57,11 +57,11 @@ function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-/** 로그인 안 됐으면 login.html로 리다이렉트 */
+/** 로그인 안 됐으면 start.html로 리다이렉트(거기서 게스트 계정을 자동 발급) */
 function requireAuth() {
   const session = getSession();
   if (!session || !session.token) {
-    window.location.href = 'login.html';
+    window.location.href = 'start.html';
     return null;
   }
   return session;
@@ -198,6 +198,28 @@ async function login(nickname, password) {
     });
     const data = await res.json();
     if (!data.ok) return { ok: false, error: data.error || '로그인 실패' };
+
+    setSession(data.token, data.userKey, data.nickname);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: '서버 연결 오류' };
+  }
+}
+
+// ─── 게스트 계정 (발표/데모용) ─────────────────────────────────
+
+/**
+ * 게스트 계정 즉시 발급 — /api/auth/guest 호출. 닉네임·비밀번호 입력 없이 세션을 받는다.
+ * @returns {Promise<{ok: boolean, error?: string}>}
+ */
+async function createGuestSession() {
+  try {
+    const res  = await fetch('/api/auth/guest', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json();
+    if (!data.ok) return { ok: false, error: data.error || '계정 생성 실패' };
 
     setSession(data.token, data.userKey, data.nickname);
     return { ok: true };
